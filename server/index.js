@@ -80,6 +80,10 @@ const DEFAULT_AVATAR = {
   color: "#4fd081"
 };
 
+const BOARD_SIZE = TILE_DATA.length;
+const PLAYDAY_INDEX = BOARD_SIZE - 1;
+const PLAYDAY_AMOUNT = 3500;
+
 function normalizeAvatar(avatar) {
   if (!avatar || typeof avatar !== "object") {
     return { ...DEFAULT_AVATAR };
@@ -160,6 +164,11 @@ function randomFrom(list) {
 function applyAmountToPlayerAndBank(player, room, amount) {
   player.cash += amount;
   room.bank -= amount;
+}
+
+function awardPlayday(player, room) {
+  player.cash += PLAYDAY_AMOUNT;
+  room.bank -= PLAYDAY_AMOUNT;
 }
 
 function drawMailCards(player, room, count) {
@@ -245,11 +254,9 @@ function getTileEffect(tile, player, room) {
     }
 
     case "payday": {
-      const amount = 3500;
-      player.cash += amount;
-      room.bank -= amount;
-      title = "PAYDAY";
-      message = `${player.name} reached PAYDAY and collected ${formatMoney(amount)}.`;
+      title = "PLAYDAY";
+      message = `${player.name} hit PLAYDAY!`;
+      eventType = "payday";
       break;
     }
 
@@ -508,7 +515,9 @@ io.on("connection", (socket) => {
     setTimeout(() => {
       const roll = Math.floor(Math.random() * 6) + 1;
       const from = currentPlayer.position;
-      const to = Math.min(TILE_DATA.length - 1, from + roll);
+      const rawTo = from + roll;
+      const passedPlayday = rawTo >= PLAYDAY_INDEX;
+      const to = rawTo % BOARD_SIZE;
 
       io.to(room.code).emit("turnRolled", {
         playerId: currentPlayer.id,
@@ -519,6 +528,15 @@ io.on("connection", (socket) => {
       setTimeout(() => {
         currentPlayer.position = to;
 
+        if (passedPlayday) {
+          awardPlayday(currentPlayer, room);
+
+          room.chat.push({
+            system: true,
+            text: `${currentPlayer.name} hit PLAYDAYYYY and collected ${formatMoney(PLAYDAY_AMOUNT)}.`
+          });
+        }
+
         io.to(room.code).emit("playerMoved", {
           playerId: currentPlayer.id,
           playerName: currentPlayer.name,
@@ -527,13 +545,31 @@ io.on("connection", (socket) => {
           roll
         });
 
+        if (passedPlayday) {
+          io.to(room.code).emit("playdayPassed", {
+            playerId: currentPlayer.id,
+            playerName: currentPlayer.name,
+            amount: PLAYDAY_AMOUNT,
+            room: getSafeRoom(room)
+          });
+
+          emitRoomUpdate(room);
+        }
+
+        const tileDelay = passedPlayday ? 2600 : 700;
+
         setTimeout(() => {
           const tile = TILE_DATA[currentPlayer.position];
           const result = getTileEffect(tile, currentPlayer, room);
 
           room.chat.push({
             system: true,
-            text: getChatSummary(currentPlayer.name, result.eventType, result.cards, result.message)
+            text: getChatSummary(
+              currentPlayer.name,
+              result.eventType,
+              result.cards,
+              result.message
+            )
           });
 
           const revealDuration = getRevealDurationMs(result.cards);
@@ -563,7 +599,7 @@ io.on("connection", (socket) => {
 
             emitRoomUpdate(room);
           }, revealDuration);
-        }, 700);
+        }, tileDelay);
       }, 1400);
     }, 300);
   });
@@ -633,6 +669,8 @@ io.on("connection", (socket) => {
   });
 });
 
-http.listen(3000, () => {
-  console.log("Running on http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+
+http.listen(PORT, () => {
+  console.log(`Running on port ${PORT}`);
 });

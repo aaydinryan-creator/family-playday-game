@@ -8,6 +8,105 @@
   >
   <title>PLAY-DAY</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .playdayOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at center, rgba(255, 221, 87, 0.22), rgba(0, 0, 0, 0.88) 55%),
+        rgba(0, 0, 0, 0.82);
+      overflow: hidden;
+      opacity: 0;
+      transform: scale(1.03);
+      pointer-events: none;
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+
+    .playdayOverlay.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .playdayRain {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .playdayMoney {
+      position: absolute;
+      top: -12%;
+      color: #ffd54a;
+      text-shadow:
+        0 0 8px rgba(255, 214, 74, 0.75),
+        0 0 18px rgba(255, 214, 74, 0.5);
+      animation-name: playdayFall;
+      animation-timing-function: linear;
+      animation-iteration-count: 1;
+      user-select: none;
+    }
+
+    @keyframes playdayFall {
+      0% {
+        transform: translateY(-10vh) rotate(0deg);
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(120vh) rotate(360deg);
+        opacity: 0.95;
+      }
+    }
+
+    .playdayContent {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 28px 20px;
+      max-width: 90vw;
+    }
+
+    .playdayTitle {
+      margin: 0;
+      font-size: clamp(42px, 10vw, 108px);
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: 0.06em;
+      color: #ffd54a;
+      text-shadow:
+        0 3px 0 #8c6b00,
+        0 10px 25px rgba(0, 0, 0, 0.45),
+        0 0 30px rgba(255, 213, 74, 0.35);
+      animation: playdayPop 0.45s ease;
+    }
+
+    .playdaySub {
+      margin-top: 16px;
+      font-size: clamp(18px, 3vw, 34px);
+      font-weight: 800;
+      color: #ffffff;
+      text-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+      animation: playdayPop 0.55s ease;
+    }
+
+    @keyframes playdayPop {
+      0% {
+        transform: scale(0.75);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+  </style>
 </head>
 <body>
   <audio id="bgMusic" loop preload="auto">
@@ -437,6 +536,14 @@
       </div>
 
       <div id="sharedDiceValue" class="sharedDiceValue">Rolling...</div>
+    </div>
+  </div>
+
+  <div id="playdayOverlay" class="playdayOverlay hidden">
+    <div id="playdayRain" class="playdayRain"></div>
+    <div class="playdayContent">
+      <h1 id="playdayTitle" class="playdayTitle">PLAYDAYYYY</h1>
+      <div id="playdayText" class="playdaySub">Collected $3,500!</div>
     </div>
   </div>
 

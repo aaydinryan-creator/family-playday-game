@@ -84,6 +84,11 @@ const sharedDiceTitle = document.getElementById("sharedDiceTitle");
 const sharedDiceCube = document.getElementById("sharedDiceCube");
 const sharedDiceValue = document.getElementById("sharedDiceValue");
 
+const playdayOverlay = document.getElementById("playdayOverlay");
+const playdayTitle = document.getElementById("playdayTitle");
+const playdayText = document.getElementById("playdayText");
+const playdayRain = document.getElementById("playdayRain");
+
 const dealDeckCard = document.querySelector(".dealDeck");
 const mailDeckCard = document.querySelector(".mailDeck");
 
@@ -596,6 +601,42 @@ async function showCardSequence(playerName, cards) {
   revealOverlay.classList.add("hidden");
 }
 
+function spawnPlaydayMoney() {
+  if (!playdayRain) return;
+
+  playdayRain.innerHTML = "";
+
+  for (let i = 0; i < 26; i++) {
+    const money = document.createElement("span");
+    money.className = "playdayMoney";
+    money.textContent = i % 2 === 0 ? "$" : "💸";
+    money.style.left = `${Math.random() * 100}%`;
+    money.style.animationDelay = `${Math.random() * 0.8}s`;
+    money.style.animationDuration = `${2.4 + Math.random() * 1.6}s`;
+    money.style.fontSize = `${22 + Math.random() * 26}px`;
+    money.style.transform = `rotate(${(-25 + Math.random() * 50).toFixed(1)}deg)`;
+    playdayRain.appendChild(money);
+  }
+}
+
+async function showPlaydaySequence(playerName, amount) {
+  if (!playdayOverlay) return;
+
+  spawnPlaydayMoney();
+  playdayTitle.textContent = "PLAYDAYYYY";
+  playdayText.textContent = `${playerName} collected ${formatMoney(amount)}!`;
+
+  playdayOverlay.classList.remove("hidden");
+  void playdayOverlay.offsetWidth;
+  playdayOverlay.classList.add("show");
+
+  await wait(2400);
+
+  playdayOverlay.classList.remove("show");
+  await wait(350);
+  playdayOverlay.classList.add("hidden");
+}
+
 function updateTurnUI() {
   if (!currentRoom) return;
 
@@ -775,6 +816,13 @@ socket.on("turnRolled", ({ playerName, roll }) => {
 
 socket.on("playerMoved", ({ playerName, from, to, roll }) => {
   console.log(`${playerName} moved from ${from} to ${to} with a roll of ${roll}.`);
+});
+
+socket.on("playdayPassed", async ({ playerName, amount, room }) => {
+  currentRoom = room;
+  renderRoom(room);
+  updateTurnUI();
+  await showPlaydaySequence(playerName, amount);
 });
 
 socket.on("tileResult", async ({ title, message, room, eventType, landedPosition, cards, playerName }) => {
