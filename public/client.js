@@ -6,6 +6,7 @@ let currentTurnPlayerId = null;
 let eventTimeout = null;
 let sharedRollingInterval = null;
 let sharedTurnRollAnimating = false;
+let globalAlertTimeout = null;
 
 const EMOJI_OPTIONS = ["😎", "🤠", "😈", "👽", "🤖", "🐸", "🦊", "🐵", "🐼", "🦄", "🐱", "🐶"];
 const HAT_OPTIONS = ["🧢", "🎩", "👑", "🪖", "⛑️", "🎓", "🤠", "🪩", "✨", "❌"];
@@ -109,6 +110,40 @@ function ensureAudioContext() {
   }
 }
 
+function playTone({
+  frequency = 440,
+  type = "sine",
+  duration = 0.12,
+  volume = 0.035,
+  startTime = null,
+  rampTo = null
+}) {
+  ensureAudioContext();
+  if (!audioContext) return;
+
+  const now = startTime ?? audioContext.currentTime;
+  const end = now + duration;
+
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, now);
+  if (rampTo) {
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, rampTo), end);
+  }
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+  osc.connect(gain);
+  gain.connect(audioContext.destination);
+
+  osc.start(now);
+  osc.stop(end + 0.02);
+}
+
 function playDiceRollSound(durationMs = 900) {
   ensureAudioContext();
   if (!audioContext) return;
@@ -137,6 +172,45 @@ function playDiceRollSound(durationMs = 900) {
 
   osc.start(now);
   osc.stop(endAt + 0.05);
+}
+
+function playMailSound() {
+  ensureAudioContext();
+  if (!audioContext) return;
+
+  const now = audioContext.currentTime;
+  playTone({ frequency: 540, type: "triangle", duration: 0.08, volume: 0.03, startTime: now });
+  playTone({ frequency: 760, type: "triangle", duration: 0.08, volume: 0.025, startTime: now + 0.09 });
+  playTone({ frequency: 620, type: "sine", duration: 0.12, volume: 0.02, startTime: now + 0.18 });
+}
+
+function playDealSound() {
+  ensureAudioContext();
+  if (!audioContext) return;
+
+  const now = audioContext.currentTime;
+  playTone({ frequency: 220, type: "sawtooth", duration: 0.12, volume: 0.04, startTime: now, rampTo: 180 });
+  playTone({ frequency: 160, type: "square", duration: 0.14, volume: 0.03, startTime: now + 0.1, rampTo: 110 });
+  playTone({ frequency: 95, type: "sawtooth", duration: 0.16, volume: 0.02, startTime: now + 0.18, rampTo: 70 });
+}
+
+function playPaydaySound() {
+  ensureAudioContext();
+  if (!audioContext) return;
+
+  const now = audioContext.currentTime;
+  playTone({ frequency: 660, type: "triangle", duration: 0.09, volume: 0.03, startTime: now });
+  playTone({ frequency: 880, type: "triangle", duration: 0.09, volume: 0.03, startTime: now + 0.08 });
+  playTone({ frequency: 1320, type: "triangle", duration: 0.16, volume: 0.03, startTime: now + 0.16 });
+}
+
+function playChaosSound() {
+  ensureAudioContext();
+  if (!audioContext) return;
+
+  const now = audioContext.currentTime;
+  playTone({ frequency: 180, type: "square", duration: 0.12, volume: 0.04, startTime: now, rampTo: 120 });
+  playTone({ frequency: 120, type: "sawtooth", duration: 0.18, volume: 0.04, startTime: now + 0.1, rampTo: 70 });
 }
 
 function tryStartMusic() {
@@ -299,6 +373,62 @@ function initAvatarPicker() {
 
     renderAvatarPicker();
   });
+}
+
+function ensureGlobalAlertDom() {
+  let overlay = document.getElementById("globalAlertOverlay");
+  if (overlay) return overlay;
+
+  overlay = document.createElement("div");
+  overlay.id = "globalAlertOverlay";
+  overlay.className = "globalAlertOverlay hidden";
+  overlay.innerHTML = `
+    <div id="globalAlertBox" class="globalAlertBox">
+      <div id="globalAlertTitle" class="globalAlertTitle"></div>
+      <div id="globalAlertText" class="globalAlertText"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function showGlobalAlert(title, text, theme = "chaos", duration = 3400) {
+  const overlay = ensureGlobalAlertDom();
+  const box = document.getElementById("globalAlertBox");
+  const titleEl = document.getElementById("globalAlertTitle");
+  const textEl = document.getElementById("globalAlertText");
+
+  if (!overlay || !box || !titleEl || !textEl) return;
+
+  clearTimeout(globalAlertTimeout);
+
+  overlay.classList.remove("hidden");
+  box.className = `globalAlertBox ${theme}`;
+  titleEl.textContent = title || "ALERT";
+  textEl.textContent = text || "";
+
+  box.classList.remove("show");
+  void box.offsetWidth;
+  box.classList.add("show");
+
+  globalAlertTimeout = setTimeout(() => {
+    overlay.classList.add("hidden");
+    box.classList.remove("show");
+  }, duration);
+}
+
+function triggerScreenShake(level = "light") {
+  const target = document.body;
+  if (!target) return;
+
+  const className = level === "heavy" ? "screenShakeHeavy" : "screenShakeLight";
+  target.classList.remove("screenShakeLight", "screenShakeHeavy");
+  void target.offsetWidth;
+  target.classList.add(className);
+
+  setTimeout(() => {
+    target.classList.remove(className);
+  }, level === "heavy" ? 850 : 500);
 }
 
 function renderRoom(room) {
@@ -569,6 +699,92 @@ function setRevealTheme(type) {
   else revealCard.classList.add("revealDefault");
 }
 
+function getCardNetAmount(cards = []) {
+  return cards.reduce((sum, card) => sum + Number(card?.amount || 0), 0);
+}
+
+function detectChaosTier(eventType, cards, title, message) {
+  const net = getCardNetAmount(cards);
+  const rawText = `${title || ""} ${message || ""} ${cards?.map((c) => `${c.title || ""} ${c.text || ""}`).join(" ") || ""}`.toLowerCase();
+
+  if (net <= -400 || rawText.includes("fat fook") || rawText.includes("broke") || rawText.includes("destroyed")) {
+    return "heavy";
+  }
+
+  if (net < 0 || eventType === "deal" || rawText.includes("lost") || rawText.includes("pay")) {
+    return "light";
+  }
+
+  return null;
+}
+
+function maybePlayEventSound(eventType, cards) {
+  const net = getCardNetAmount(cards);
+
+  if (eventType === "mail") {
+    playMailSound();
+    return;
+  }
+
+  if (eventType === "deal") {
+    playDealSound();
+    return;
+  }
+
+  if (eventType === "payday" || net >= 300) {
+    playPaydaySound();
+    return;
+  }
+
+  if (net <= -250) {
+    playChaosSound();
+  }
+}
+
+function maybeShowGlobalAlert({ playerName, eventType, cards, title, message }) {
+  const net = getCardNetAmount(cards);
+  const chaosTier = detectChaosTier(eventType, cards, title, message);
+
+  if (eventType === "payday" || net >= 300) {
+    showGlobalAlert(
+      "💰 PAYDAY CHA-CHING 💰",
+      `${playerName} just got paid ${formatMoney(net > 0 ? net : 300)}.`,
+      "money",
+      3600
+    );
+    return;
+  }
+
+  if (eventType === "mail" && net <= -250) {
+    showGlobalAlert(
+      "📬 EVIL MAIL 📬",
+      `${playerName} opened mail and got absolutely cooked.`,
+      "mail",
+      3600
+    );
+    return;
+  }
+
+  if (eventType === "deal" && net <= -250) {
+    showGlobalAlert(
+      "💀 TERRIBLE DEAL 💀",
+      `${playerName} fell for a brutal deal.`,
+      "deal",
+      3600
+    );
+    return;
+  }
+
+  if (chaosTier === "heavy") {
+    showGlobalAlert(
+      "🚨 SERVER-WIDE CHAOS 🚨",
+      `${playerName} just got SMOKED.`,
+      "chaos",
+      3600
+    );
+  }
+}
+
 async function showCardSequence(playerName, cards) {
   if (!cards || !cards.length) return;
   if (!revealOverlay || !revealPlayer || !revealCount || !revealFrontTitle || !revealFrontText || !revealAmount || !revealCard) return;
@@ -745,6 +961,7 @@ socket.on("gameStarted", ({ room }) => {
   renderRoom(room);
   showScreen("game");
   showEvent("Game Started", "The game has begun.", "default", 4500);
+  showGlobalAlert("🎲 PLAY-DAY STARTED 🎲", "Everybody lock in. The chaos begins now.", "chaos", 3200);
 });
 
 socket.on("turnUpdate", ({ currentPlayerId, currentPlayerName }) => {
@@ -772,6 +989,10 @@ socket.on("playdayPassed", async ({ playerName, amount, room }) => {
   currentRoom = room;
   renderRoom(room);
   updateTurnUI();
+
+  playPaydaySound();
+  showGlobalAlert("💸 PAYDAYYYYY 💸", `${playerName} just scooped ${formatMoney(amount)}.`, "money", 3600);
+
   await showPlaydaySequence(playerName, amount);
 });
 
@@ -782,6 +1003,15 @@ socket.on("tileResult", async ({ title, message, room, eventType, landedPosition
 
   flashTile(landedPosition);
   pulseDeck(eventType);
+  maybePlayEventSound(eventType, cards);
+  maybeShowGlobalAlert({ playerName: playerName || "Someone", eventType, cards, title, message });
+
+  const chaosTier = detectChaosTier(eventType, cards, title, message);
+  if (chaosTier === "heavy") {
+    triggerScreenShake("heavy");
+  } else if (chaosTier === "light") {
+    triggerScreenShake("light");
+  }
 
   if (cards && cards.length) {
     await showCardSequence(playerName || "Someone", cards);
@@ -812,3 +1042,4 @@ socket.on("errorMessage", (message) => {
 
 initAvatarPicker();
 updateMusicButton();
+ensureGlobalAlertDom();

@@ -1094,6 +1094,165 @@ button:disabled {
   color: #dce7f5;
 }
 
+.globalAlertOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 18px;
+}
+
+.globalAlertBox {
+  width: min(92vw, 760px);
+  border-radius: 22px;
+  padding: 18px 22px;
+  background: linear-gradient(180deg, rgba(28, 35, 50, 0.98), rgba(16, 20, 31, 0.98));
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 22px 55px rgba(0,0,0,0.45);
+  text-align: center;
+  transform: translateY(-18px) scale(0.96);
+  opacity: 0;
+}
+
+.globalAlertBox.show {
+  animation: globalAlertInOut 3.4s ease forwards;
+}
+
+.globalAlertTitle {
+  font-size: clamp(22px, 4vw, 34px);
+  font-weight: 900;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.globalAlertText {
+  font-size: clamp(14px, 2vw, 18px);
+  color: #e6edf8;
+  line-height: 1.4;
+}
+
+.globalAlertBox.chaos {
+  background: linear-gradient(180deg, rgba(107, 18, 18, 0.98), rgba(60, 10, 10, 0.98));
+  border-color: rgba(255, 120, 120, 0.35);
+}
+
+.globalAlertBox.money {
+  background: linear-gradient(180deg, rgba(35, 96, 38, 0.98), rgba(18, 55, 20, 0.98));
+  border-color: rgba(155, 240, 142, 0.35);
+}
+
+.globalAlertBox.mail {
+  background: linear-gradient(180deg, rgba(95, 72, 17, 0.98), rgba(57, 43, 10, 0.98));
+  border-color: rgba(255, 221, 129, 0.35);
+}
+
+.globalAlertBox.deal {
+  background: linear-gradient(180deg, rgba(120, 37, 37, 0.98), rgba(73, 15, 15, 0.98));
+  border-color: rgba(255, 162, 162, 0.35);
+}
+
+.revealOverlay,
+.sharedDiceOverlay,
+.globalAlertOverlay {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.revealOverlay.show,
+.sharedDiceOverlay.show,
+.globalAlertOverlay.show {
+  display: flex;
+}
+
+.screenShakeLight {
+  animation: screenShakeLight 0.45s linear;
+}
+
+.screenShakeHeavy {
+  animation: screenShakeHeavy 0.8s linear;
+}
+
+.playdayOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at center, rgba(255, 221, 87, 0.22), rgba(0, 0, 0, 0.72)),
+    rgba(7, 10, 16, 0.72);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.playdayOverlay.show {
+  opacity: 1;
+}
+
+.playdayCard {
+  position: relative;
+  width: min(92vw, 540px);
+  border-radius: 28px;
+  padding: 34px 26px;
+  text-align: center;
+  background: linear-gradient(180deg, #2d7a2f 0%, #1e521f 100%);
+  border: 2px solid rgba(188, 255, 174, 0.3);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+.playdayTitle {
+  font-size: clamp(36px, 9vw, 64px);
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #ffef7d;
+  text-shadow: 0 3px 0 #8e8824, 0 10px 24px rgba(0,0,0,0.35);
+  margin-bottom: 10px;
+}
+
+.playdayText {
+  font-size: clamp(18px, 4vw, 28px);
+  font-weight: 800;
+  color: #f5fff1;
+  margin-bottom: 0;
+}
+
+.playdayRain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.playdayMoney {
+  position: absolute;
+  top: -20%;
+  animation-name: playdayRainDrop;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  opacity: 0.95;
+}
+
+@keyframes playdayRainDrop {
+  0% {
+    transform: translateY(-20%) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(135vh) rotate(250deg);
+    opacity: 0.95;
+  }
+}
+
 @keyframes popupIn {
   0% {
     transform: translateY(12px) scale(0.96);
@@ -1135,6 +1294,48 @@ button:disabled {
   0% { transform: scale(1); }
   50% { transform: scale(1.08); }
   100% { transform: scale(1); }
+}
+
+@keyframes globalAlertInOut {
+  0% {
+    transform: translateY(-18px) scale(0.96);
+    opacity: 0;
+  }
+  10% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  82% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-12px) scale(0.97);
+    opacity: 0;
+  }
+}
+
+@keyframes screenShakeLight {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-3px, 2px); }
+  40% { transform: translate(3px, -2px); }
+  60% { transform: translate(-2px, -1px); }
+  80% { transform: translate(2px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes screenShakeHeavy {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-8px, 3px) rotate(-0.4deg); }
+  20% { transform: translate(8px, -5px) rotate(0.4deg); }
+  30% { transform: translate(-7px, 4px) rotate(-0.3deg); }
+  40% { transform: translate(7px, -4px) rotate(0.3deg); }
+  50% { transform: translate(-6px, 2px) rotate(-0.2deg); }
+  60% { transform: translate(6px, -3px) rotate(0.2deg); }
+  70% { transform: translate(-5px, 3px) rotate(-0.2deg); }
+  80% { transform: translate(5px, -2px) rotate(0.2deg); }
+  90% { transform: translate(-2px, 1px) rotate(-0.1deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
 }
 
 @media (max-width: 1180px) {
@@ -1317,5 +1518,10 @@ button:disabled {
   .sharedDicePanel,
   .flipCard {
     width: min(92vw, 420px);
+  }
+
+  .globalAlertBox {
+    padding: 16px 16px;
+    border-radius: 18px;
   }
 }
