@@ -321,7 +321,7 @@ function handleTile(room, player, roll) {
 
     case "ski":
       removeMoney(player, room, tile.cost);
-      message = `${player.name} paid ${formatMoney(tile.cost)} for Super Ski Sunday.`;
+      message = `${player.name} paid ${formatMoney(tile.cost)} for Top Golf.`;
       soundCue = "money_loss";
       break;
 
