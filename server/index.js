@@ -545,6 +545,8 @@ io.on("connection", (socket) => {
           roll
         });
 
+        emitRoomUpdate(room);
+
         if (passedPlayday) {
           io.to(room.code).emit("playdayPassed", {
             playerId: currentPlayer.id,
@@ -553,10 +555,66 @@ io.on("connection", (socket) => {
             room: getSafeRoom(room)
           });
 
-          emitRoomUpdate(room);
-        }
+          setTimeout(() => {
+            if (to === PLAYDAY_INDEX) {
+              room.turnIndex = (room.turnIndex + 1) % room.players.length;
 
-        const tileDelay = passedPlayday ? 2600 : 700;
+              const nextPlayer = getCurrentPlayer(room);
+              if (nextPlayer) {
+                io.to(room.code).emit("turnUpdate", {
+                  currentPlayerId: nextPlayer.id,
+                  currentPlayerName: nextPlayer.name
+                });
+              }
+
+              emitRoomUpdate(room);
+              return;
+            }
+
+            const tile = TILE_DATA[currentPlayer.position];
+            const result = getTileEffect(tile, currentPlayer, room);
+
+            room.chat.push({
+              system: true,
+              text: getChatSummary(
+                currentPlayer.name,
+                result.eventType,
+                result.cards,
+                result.message
+              )
+            });
+
+            const revealDuration = getRevealDurationMs(result.cards);
+
+            io.to(room.code).emit("tileResult", {
+              title: result.title,
+              message: result.message,
+              eventType: result.eventType,
+              cards: result.cards,
+              landedPosition: currentPlayer.position,
+              playerName: currentPlayer.name,
+              room: getSafeRoom(room)
+            });
+
+            emitRoomUpdate(room);
+
+            setTimeout(() => {
+              room.turnIndex = (room.turnIndex + 1) % room.players.length;
+
+              const nextPlayer = getCurrentPlayer(room);
+              if (nextPlayer) {
+                io.to(room.code).emit("turnUpdate", {
+                  currentPlayerId: nextPlayer.id,
+                  currentPlayerName: nextPlayer.name
+                });
+              }
+
+              emitRoomUpdate(room);
+            }, revealDuration);
+          }, 2400);
+
+          return;
+        }
 
         setTimeout(() => {
           const tile = TILE_DATA[currentPlayer.position];
@@ -599,7 +657,7 @@ io.on("connection", (socket) => {
 
             emitRoomUpdate(room);
           }, revealDuration);
-        }, tileDelay);
+        }, 700);
       }, 1400);
     }, 300);
   });
