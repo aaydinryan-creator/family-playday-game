@@ -1,4 +1,4 @@
-const socket = io("https://family-playday-game.onrender.com");
+const socket = io();
 
 let currentRoom = null;
 let myId = null;
@@ -102,15 +102,24 @@ const bgMusic = document.getElementById("bgMusic");
 const musicToggleBtn = document.getElementById("musicToggleBtn");
 
 function getReconnectId() {
-  let reconnectId = localStorage.getItem("playday_reconnect_id");
+  let reconnectId = sessionStorage.getItem("playday_reconnect_id");
   if (!reconnectId) {
     reconnectId = `playday_${Math.random().toString(36).slice(2)}_${Date.now()}`;
-    localStorage.setItem("playday_reconnect_id", reconnectId);
+    sessionStorage.setItem("playday_reconnect_id", reconnectId);
   }
   return reconnectId;
 }
 
-const reconnectId = getReconnectId();
+function clearReconnectId() {
+  sessionStorage.removeItem("playday_reconnect_id");
+}
+
+let reconnectId = getReconnectId();
+
+function resetReconnectId() {
+  clearReconnectId();
+  reconnectId = getReconnectId();
+}
 
 function isTypingInField(target) {
   if (!target) return false;
@@ -555,6 +564,10 @@ function renderPlayers(room) {
       ? `<span class="youTag">YOU</span>`
       : "";
 
+    const offlineBadge = player.connected === false
+      ? `<span class="rolledTag">OFFLINE</span>`
+      : "";
+
     const placeBadge = `<span class="rolledTag">#${index + 1}</span>`;
     const itemCount = getInventoryCount(player);
 
@@ -567,6 +580,7 @@ function renderPlayers(room) {
         ${placeBadge}
         ${hostBadge}
         ${youBadge}
+        ${offlineBadge}
         <span class="rolledTag">ITEMS ${itemCount}</span>
       </div>
     `;
@@ -592,7 +606,7 @@ function renderGameMoneyBoard(players) {
         ${createAvatarMarkup(player.avatar)}
         <span class="moneyName">#${index + 1} ${escapeHtml(player.name)}</span>
       </div>
-      <span class="moneyCash">${formatMoney(player.cash)} · ${getInventoryCount(player)} items</span>
+      <span class="moneyCash">${formatMoney(player.cash)} · ${getInventoryCount(player)} items${player.connected === false ? " · offline" : ""}</span>
     `;
     gamePlayersList.appendChild(row);
   });
@@ -611,6 +625,9 @@ function renderBoardPieces(players) {
     piece.className = `boardPiece ${player.id === currentTurnPlayerId ? "currentTurnPiece" : ""}`;
     piece.innerHTML = createAvatarMarkup(player.avatar, "boardAvatar");
     piece.title = player.name;
+    if (player.connected === false) {
+      piece.style.opacity = "0.45";
+    }
     tilePieces.appendChild(piece);
   });
 }
@@ -1022,6 +1039,7 @@ function primeAudioAndMusic() {
 createRoomBtn?.addEventListener("click", () => {
   primeAudioAndMusic();
   setMessage("");
+  resetReconnectId();
 
   socket.emit("createRoom", {
     name: nameInput?.value || "",
@@ -1049,6 +1067,7 @@ startGameBtn?.addEventListener("click", () => {
 });
 
 leaveLobbyBtn?.addEventListener("click", () => {
+  clearReconnectId();
   enableIntentionalPageExit();
   window.location.reload();
 });

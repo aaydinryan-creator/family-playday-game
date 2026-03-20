@@ -13,7 +13,6 @@ const {
   generateRoomCode,
   getRoomBySocketId,
   getPlayerBySocketId,
-  removePlayerFromRoom,
   ensureValidTurnIndex,
   transferHostIfNeeded,
   getSafeRoom,
@@ -122,6 +121,11 @@ function finalizePlayerRemoval(room, playerIdToRemove) {
 
   const removedPlayer = room.players[removedIndex];
 
+  if (removedPlayer.disconnectTimer) {
+    clearTimeout(removedPlayer.disconnectTimer);
+    removedPlayer.disconnectTimer = null;
+  }
+
   room.players.splice(removedIndex, 1);
 
   if (room.players.length === 0) {
@@ -157,29 +161,6 @@ io.on("connection", (socket) => {
 
     if (!trimmedName) {
       socket.emit("errorMessage", "Please enter your name.");
-      return;
-    }
-
-    const existingRoom = findRoomByReconnectId(safeReconnectId);
-    const existingPlayer = existingRoom
-      ? findPlayerByReconnectId(existingRoom, safeReconnectId)
-      : null;
-
-    if (existingRoom && existingPlayer) {
-      markPlayerConnected(existingPlayer, socket, trimmedName, normalizedAvatar);
-      attachSocketToRoom(socket, existingRoom, safeReconnectId);
-
-      socket.emit("roomJoined", {
-        room: getSafeRoom(existingRoom),
-        yourId: socket.id
-      });
-
-      emitRoomUpdate(io, existingRoom);
-
-      if (existingRoom.phase !== "lobby") {
-        sendTurnUpdate(io, existingRoom);
-      }
-
       return;
     }
 
@@ -384,13 +365,14 @@ io.on("connection", (socket) => {
     pushSystemMessage(room, `${player.name} disconnected. Waiting for them to come back...`);
     emitRoomUpdate(io, room);
 
+    const reconnectIdAtDisconnect = player.reconnectId;
     const playerIdAtDisconnect = player.id;
 
     player.disconnectTimer = setTimeout(() => {
       const stillThere = room.players.find(
         (p) =>
           p.reconnectId &&
-          p.reconnectId === player.reconnectId
+          p.reconnectId === reconnectIdAtDisconnect
       );
 
       if (!stillThere) return;
