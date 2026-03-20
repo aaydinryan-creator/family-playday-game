@@ -7,7 +7,7 @@ let eventTimeout = null;
 let sharedRollingInterval = null;
 let sharedTurnRollAnimating = false;
 
-const EMOJI_OPTIONS = ["😎", "🤠", "😈", "👽", "🤖", "🐸", "🦊", "🐵", "🐼", "🦄"];
+const EMOJI_OPTIONS = ["😎", "🤠", "😈", "👽", "🤖", "🐸", "🦊", "🐵", "🐼", "🦄", "🐱", "🐶"];
 const HAT_OPTIONS = ["🧢", "🎩", "👑", "🪖", "⛑️", "🎓", "🤠", "🪩", "✨", "❌"];
 const COLOR_OPTIONS = ["#4fd081", "#5b88f1", "#f05b5b", "#f0c64d", "#9b6bff", "#ff8f4f", "#3ed1d7", "#f26bd3"];
 
@@ -317,7 +317,7 @@ function renderRoom(room) {
   renderBoardPieces(room.players || []);
 
   if (startGameBtn) {
-    const amHost = room.players?.[0]?.id === myId;
+    const amHost = room.hostId === myId;
     if (amHost && room.phase === "lobby") {
       startGameBtn.classList.remove("hidden");
     } else {
@@ -327,7 +327,12 @@ function renderRoom(room) {
 
   if (room.phase === "lobby") {
     showScreen("lobby");
-  } else if (room.phase === "game" || room.phase === "roll" || room.phase === "moving" || room.phase === "resolving") {
+  } else if (
+    room.phase === "game" ||
+    room.phase === "rolling" ||
+    room.phase === "moving" ||
+    room.phase === "resolving"
+  ) {
     showScreen("game");
   }
 }
@@ -337,10 +342,10 @@ function renderPlayers(room) {
 
   playerList.innerHTML = "";
 
-  (room.players || []).forEach((player, index) => {
+  (room.players || []).forEach((player) => {
     const li = document.createElement("li");
 
-    const hostBadge = index === 0
+    const hostBadge = player.id === room.hostId
       ? `<span class="hostTag">HOST</span>`
       : "";
 
@@ -477,7 +482,7 @@ function stopSharedDice(value, playerName) {
 
   setTimeout(() => {
     sharedDiceOverlay.classList.add("hidden");
-  }, 1200);
+  }, 1600);
 }
 
 function clearPopupTheme() {
@@ -494,7 +499,7 @@ function clearPopupTheme() {
   );
 }
 
-function showEvent(title, message, type = "default", duration = 3000) {
+function showEvent(title, message, type = "default", duration = 7000) {
   if (!eventPopup || !eventTitle || !eventMessage) return;
 
   clearTimeout(eventTimeout);
@@ -585,11 +590,12 @@ async function showCardSequence(playerName, cards) {
     revealCard.classList.remove("flipped");
     void revealCard.offsetWidth;
 
-    await wait(350);
+    await wait(700);
     revealCard.classList.add("flipped");
-    await wait(1850);
+    await wait(5200);
   }
 
+  await wait(1200);
   revealOverlay.classList.add("hidden");
 }
 
@@ -622,10 +628,10 @@ async function showPlaydaySequence(playerName, amount) {
   void playdayOverlay.offsetWidth;
   playdayOverlay.classList.add("show");
 
-  await wait(2400);
+  await wait(3200);
 
   playdayOverlay.classList.remove("show");
-  await wait(350);
+  await wait(450);
   playdayOverlay.classList.add("hidden");
 }
 
@@ -738,14 +744,14 @@ socket.on("gameStarted", ({ room }) => {
   currentRoom = room;
   renderRoom(room);
   showScreen("game");
-  showEvent("Game Started", "The game has begun.", "default", 2200);
+  showEvent("Game Started", "The game has begun.", "default", 4500);
 });
 
 socket.on("turnUpdate", ({ currentPlayerId, currentPlayerName }) => {
   currentTurnPlayerId = currentPlayerId;
   sharedTurnRollAnimating = false;
   updateTurnUI();
-  showEvent("Next Turn", `${currentPlayerName}'s turn.`, "default", 2000);
+  showEvent("Next Turn", `${currentPlayerName}'s turn.`, "default", 4000);
 });
 
 socket.on("turnRolled", ({ playerName, roll }) => {
@@ -755,7 +761,7 @@ socket.on("turnRolled", ({ playerName, roll }) => {
 
   setTimeout(() => {
     stopSharedDice(roll, playerName);
-  }, 1000);
+  }, 1200);
 });
 
 socket.on("playerMoved", ({ playerName, from, to, roll }) => {
@@ -780,7 +786,7 @@ socket.on("tileResult", async ({ title, message, room, eventType, landedPosition
   if (cards && cards.length) {
     await showCardSequence(playerName || "Someone", cards);
   } else {
-    showEvent(title, message, eventType, 2600);
+    showEvent(title, message, eventType, 8000);
   }
 });
 
@@ -800,7 +806,7 @@ socket.on("errorMessage", (message) => {
   } else if (rollScreen && !rollScreen.classList.contains("hidden")) {
     setRollMessage(message);
   } else {
-    showEvent("Error", message, "default");
+    showEvent("Error", message, "default", 7000);
   }
 });
 
