@@ -361,13 +361,15 @@ button:disabled {
 
 .playerTags {
   margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .hostTag,
 .youTag,
 .rolledTag {
   display: inline-block;
-  margin-right: 8px;
   padding: 4px 8px;
   border-radius: 999px;
   font-size: 11px;
@@ -671,8 +673,9 @@ button:disabled {
 #boardOuterScroll {
   overflow-x: auto;
   overflow-y: visible;
-  padding-bottom: 6px;
+  padding-bottom: 10px;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 #boardWrap {
@@ -763,10 +766,12 @@ button:disabled {
 
 .tileLabel {
   font-weight: 900;
-  font-size: 16px;
+  font-size: 15px;
+  line-height: 1.15;
   color: #1c2430;
-  max-width: 90%;
-  margin-top: 8px;
+  max-width: 92%;
+  margin-top: 10px;
+  text-wrap: balance;
 }
 
 .tilePieces {
@@ -840,7 +845,7 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   border-radius: 12px;
   background: rgba(255,255,255,0.05);
   font-size: 14px;
@@ -854,6 +859,7 @@ button:disabled {
 .moneyCash {
   color: #98f0b8;
   font-weight: 800;
+  text-align: right;
 }
 
 .gameChat {
@@ -862,14 +868,20 @@ button:disabled {
 }
 
 .eventPopup {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%) translateY(10px) scale(0.96);
+  width: min(92vw, 620px);
+  z-index: 60;
   border: 1px solid rgba(255,255,255,0.09);
   background: rgba(38, 47, 67, 0.92);
   border-radius: 18px;
   padding: 16px 18px;
   box-shadow: var(--shadow);
   white-space: pre-line;
-  transform: translateY(10px) scale(0.96);
   opacity: 0;
+  pointer-events: none;
 }
 
 .eventPopup h3 {
@@ -879,8 +891,9 @@ button:disabled {
 
 .eventPopup p {
   margin: 0;
-  line-height: 1.45;
+  line-height: 1.5;
   color: #f2f6fc;
+  font-size: 15px;
 }
 
 .popupShow {
@@ -938,13 +951,14 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 18px;
-  background: rgba(7, 10, 16, 0.68);
+  background: rgba(7, 10, 16, 0.72);
   backdrop-filter: blur(4px);
   padding: 16px;
 }
 
 .revealHud {
   text-align: center;
+  max-width: min(92vw, 600px);
 }
 
 .revealPlayer {
@@ -960,8 +974,8 @@ button:disabled {
 }
 
 .flipCard {
-  width: min(88vw, 430px);
-  height: 280px;
+  width: min(92vw, 470px);
+  height: 330px;
   perspective: 1200px;
 }
 
@@ -1037,7 +1051,7 @@ button:disabled {
 }
 
 .cardFrontText {
-  line-height: 1.45;
+  line-height: 1.55;
   font-size: 18px;
   color: #f3f7fc;
 }
@@ -1118,7 +1132,7 @@ button:disabled {
 }
 
 .globalAlertBox.show {
-  animation: globalAlertInOut 3.4s ease forwards;
+  animation: globalAlertInOut 3.1s ease forwards;
 }
 
 .globalAlertTitle {
@@ -1255,15 +1269,15 @@ button:disabled {
 
 @keyframes popupIn {
   0% {
-    transform: translateY(12px) scale(0.96);
+    transform: translateX(-50%) translateY(12px) scale(0.96);
     opacity: 0;
   }
   70% {
-    transform: translateY(-3px) scale(1.01);
+    transform: translateX(-50%) translateY(-3px) scale(1.01);
     opacity: 1;
   }
   100% {
-    transform: translateY(0) scale(1);
+    transform: translateX(-50%) translateY(0) scale(1);
     opacity: 1;
   }
 }
@@ -1394,7 +1408,7 @@ button:disabled {
     z-index: 20;
     padding: 8px;
     border-radius: 18px;
-    background: rgba(11, 13, 18, 0.75);
+    background: rgba(11, 13, 18, 0.78);
     backdrop-filter: blur(8px);
   }
 
@@ -1417,6 +1431,16 @@ button:disabled {
   .gameChat {
     min-height: 220px;
     max-height: 320px;
+  }
+
+  .moneyRow {
+    flex-wrap: wrap;
+  }
+
+  .moneyCash {
+    width: 100%;
+    text-align: left;
+    padding-left: 44px;
   }
 }
 
@@ -1483,11 +1507,17 @@ button:disabled {
   .bottomRight { bottom: 14px; right: 14px; }
 
   .flipCard {
-    height: 300px;
+    height: 360px;
+    width: min(94vw, 430px);
   }
 
   .cardFrontText {
     font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .cardFrontTitle {
+    font-size: 28px;
   }
 
   .revealPlayer {
@@ -1512,7 +1542,17 @@ button:disabled {
   }
 
   .eventPopup {
+    width: min(94vw, 540px);
     padding: 14px;
+    bottom: 12px;
+  }
+
+  .eventPopup h3 {
+    font-size: 19px;
+  }
+
+  .eventPopup p {
+    font-size: 14px;
   }
 
   .sharedDicePanel,
@@ -1523,5 +1563,71 @@ button:disabled {
   .globalAlertBox {
     padding: 16px 16px;
     border-radius: 18px;
+  }
+
+  .playdayCard {
+    padding: 28px 18px;
+  }
+
+  .moneyNameWrap {
+    align-items: flex-start;
+  }
+
+  .moneyCash {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  #gameScreen {
+    padding: 10px;
+  }
+
+  .panel,
+  #boardWrap,
+  .sideCard,
+  .cardSection {
+    border-radius: 16px;
+  }
+
+  .tile {
+    min-height: 96px;
+    padding: 10px 6px 8px;
+  }
+
+  .tileLabel {
+    font-size: 12px;
+    margin-top: 12px;
+  }
+
+  .boardAvatar {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+  }
+
+  .boardAvatar .avatarEmoji {
+    font-size: 13px;
+  }
+
+  .boardAvatar .avatarHat {
+    font-size: 11px;
+    top: -8px;
+  }
+
+  .cardFrontText {
+    font-size: 15px;
+  }
+
+  .cardAmount {
+    font-size: 18px;
+  }
+
+  .playdayTitle {
+    font-size: clamp(30px, 10vw, 44px);
+  }
+
+  .playdayText {
+    font-size: 17px;
   }
 }

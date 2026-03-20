@@ -8,6 +8,9 @@ let sharedRollingInterval = null;
 let sharedTurnRollAnimating = false;
 let globalAlertTimeout = null;
 
+const CARD_READ_TIME = 9000;
+const GLOBAL_ALERT_TIME = 2400;
+
 const EMOJI_OPTIONS = ["😎", "🤠", "😈", "👽", "🤖", "🐸", "🦊", "🐵", "🐼", "🦄", "🐱", "🐶"];
 const HAT_OPTIONS = ["🧢", "🎩", "👑", "🪖", "⛑️", "🎓", "🤠", "🪩", "✨", "❌"];
 const COLOR_OPTIONS = ["#4fd081", "#5b88f1", "#f05b5b", "#f0c64d", "#9b6bff", "#ff8f4f", "#3ed1d7", "#f26bd3"];
@@ -213,6 +216,15 @@ function playChaosSound() {
   playTone({ frequency: 120, type: "sawtooth", duration: 0.18, volume: 0.04, startTime: now + 0.1, rampTo: 70 });
 }
 
+function playBuyerSound() {
+  ensureAudioContext();
+  if (!audioContext) return;
+
+  const now = audioContext.currentTime;
+  playTone({ frequency: 500, type: "sine", duration: 0.08, volume: 0.03, startTime: now });
+  playTone({ frequency: 640, type: "sine", duration: 0.08, volume: 0.03, startTime: now + 0.08 });
+}
+
 function tryStartMusic() {
   if (!bgMusic || musicStarted || !musicEnabled) return;
 
@@ -308,6 +320,10 @@ function createAvatarMarkup(avatar, extraClass = "") {
   `;
 }
 
+function getInventoryCount(player) {
+  return Array.isArray(player?.inventory?.items) ? player.inventory.items.length : 0;
+}
+
 function renderAvatarPicker() {
   if (!emojiChoices || !hatChoices || !colorChoices || !avatarPreview) return;
 
@@ -392,7 +408,7 @@ function ensureGlobalAlertDom() {
   return overlay;
 }
 
-function showGlobalAlert(title, text, theme = "chaos", duration = 3400) {
+function showGlobalAlert(title, text, theme = "chaos", duration = GLOBAL_ALERT_TIME) {
   const overlay = ensureGlobalAlertDom();
   const box = document.getElementById("globalAlertBox");
   const titleEl = document.getElementById("globalAlertTitle");
@@ -470,9 +486,13 @@ function renderRoom(room) {
 function renderPlayers(room) {
   if (!playerList) return;
 
+  const sortedPlayers = [...(room.players || [])].sort((a, b) => {
+    return Number(b.cash || 0) - Number(a.cash || 0);
+  });
+
   playerList.innerHTML = "";
 
-  (room.players || []).forEach((player) => {
+  sortedPlayers.forEach((player, index) => {
     const li = document.createElement("li");
 
     const hostBadge = player.id === room.hostId
@@ -483,14 +503,19 @@ function renderPlayers(room) {
       ? `<span class="youTag">YOU</span>`
       : "";
 
+    const placeBadge = `<span class="rolledTag">#${index + 1}</span>`;
+    const itemCount = getInventoryCount(player);
+
     li.innerHTML = `
       <div class="playerLine">
         ${createAvatarMarkup(player.avatar)}
         <span>${escapeHtml(player.name)}</span>
       </div>
       <div class="playerTags">
+        ${placeBadge}
         ${hostBadge}
         ${youBadge}
+        <span class="rolledTag">ITEMS ${itemCount}</span>
       </div>
     `;
 
@@ -501,17 +526,21 @@ function renderPlayers(room) {
 function renderGameMoneyBoard(players) {
   if (!gamePlayersList) return;
 
+  const sortedPlayers = [...players].sort((a, b) => {
+    return Number(b.cash || 0) - Number(a.cash || 0);
+  });
+
   gamePlayersList.innerHTML = "";
 
-  players.forEach((player) => {
+  sortedPlayers.forEach((player, index) => {
     const row = document.createElement("div");
     row.className = "moneyRow";
     row.innerHTML = `
       <div class="moneyNameWrap">
         ${createAvatarMarkup(player.avatar)}
-        <span class="moneyName">${escapeHtml(player.name)}</span>
+        <span class="moneyName">#${index + 1} ${escapeHtml(player.name)}</span>
       </div>
-      <span class="moneyCash">${formatMoney(player.cash)}</span>
+      <span class="moneyCash">${formatMoney(player.cash)} · ${getInventoryCount(player)} items</span>
     `;
     gamePlayersList.appendChild(row);
   });
@@ -629,7 +658,7 @@ function clearPopupTheme() {
   );
 }
 
-function showEvent(title, message, type = "default", duration = 7000) {
+function showEvent(title, message, type = "default", duration = 4200) {
   if (!eventPopup || !eventTitle || !eventMessage) return;
 
   clearTimeout(eventTimeout);
@@ -683,6 +712,14 @@ function flashTile(position) {
   setTimeout(() => {
     tileEl.classList.remove("tileFlash");
   }, 1100);
+
+  if (window.innerWidth <= 950) {
+    tileEl.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "center"
+    });
+  }
 }
 
 function getAmountLabel(amount) {
@@ -707,19 +744,20 @@ function detectChaosTier(eventType, cards, title, message) {
   const net = getCardNetAmount(cards);
   const rawText = `${title || ""} ${message || ""} ${cards?.map((c) => `${c.title || ""} ${c.text || ""}`).join(" ") || ""}`.toLowerCase();
 
-  if (net <= -400 || rawText.includes("fat fook") || rawText.includes("broke") || rawText.includes("destroyed")) {
+  if (net <= -400 || rawText.includes("fat fook") || rawText.includes("broke") || rawText.includes("destroyed") || rawText.includes("ruined")) {
     return "heavy";
   }
 
-  if (net < 0 || eventType === "deal" || rawText.includes("lost") || rawText.includes("pay")) {
+  if (net < 0 || eventType === "deal" || rawText.includes("lost") || rawText.includes("pay") || rawText.includes("cooked")) {
     return "light";
   }
 
   return null;
 }
 
-function maybePlayEventSound(eventType, cards) {
+function maybePlayEventSound(eventType, cards, title, message) {
   const net = getCardNetAmount(cards);
+  const lower = `${title || ""} ${message || ""}`.toLowerCase();
 
   if (eventType === "mail") {
     playMailSound();
@@ -731,7 +769,12 @@ function maybePlayEventSound(eventType, cards) {
     return;
   }
 
-  if (eventType === "payday" || net >= 300) {
+  if (eventType === "buyer" || lower.includes("sold") || lower.includes("buyer")) {
+    playBuyerSound();
+    return;
+  }
+
+  if (eventType === "payday" || eventType === "radio" || eventType === "lottery" || net >= 300) {
     playPaydaySound();
     return;
   }
@@ -744,13 +787,13 @@ function maybePlayEventSound(eventType, cards) {
 function maybeShowGlobalAlert({ playerName, eventType, cards, title, message }) {
   const net = getCardNetAmount(cards);
   const chaosTier = detectChaosTier(eventType, cards, title, message);
+  const lower = `${title || ""} ${message || ""}`.toLowerCase();
 
   if (eventType === "payday" || net >= 300) {
     showGlobalAlert(
       "💰 PAYDAY CHA-CHING 💰",
       `${playerName} just got paid ${formatMoney(net > 0 ? net : 300)}.`,
-      "money",
-      3600
+      "money"
     );
     return;
   }
@@ -759,8 +802,7 @@ function maybeShowGlobalAlert({ playerName, eventType, cards, title, message }) 
     showGlobalAlert(
       "📬 EVIL MAIL 📬",
       `${playerName} opened mail and got absolutely cooked.`,
-      "mail",
-      3600
+      "mail"
     );
     return;
   }
@@ -769,8 +811,16 @@ function maybeShowGlobalAlert({ playerName, eventType, cards, title, message }) 
     showGlobalAlert(
       "💀 TERRIBLE DEAL 💀",
       `${playerName} fell for a brutal deal.`,
-      "deal",
-      3600
+      "deal"
+    );
+    return;
+  }
+
+  if (lower.includes("sold") && lower.includes("for $")) {
+    showGlobalAlert(
+      "🛒 IT SOLD 🛒",
+      `${playerName} finally moved some junk and got paid.`,
+      "money"
     );
     return;
   }
@@ -779,9 +829,46 @@ function maybeShowGlobalAlert({ playerName, eventType, cards, title, message }) 
     showGlobalAlert(
       "🚨 SERVER-WIDE CHAOS 🚨",
       `${playerName} just got SMOKED.`,
-      "chaos",
-      3600
+      "chaos"
     );
+  }
+}
+
+function maybeShowTilePopup(eventType, title, message, playerName) {
+  if (!title && !message) return;
+
+  if (eventType === "lottery") {
+    showEvent(title || "Lucky BS", message || `${playerName} hit a lucky tile.`, "lottery", 3600);
+    return;
+  }
+
+  if (eventType === "radio") {
+    showEvent(title || "Radio Flex", message || `${playerName} flexed on the radio.`, "radio", 3600);
+    return;
+  }
+
+  if (eventType === "payday") {
+    showEvent(title || "PAYDAY", message || `${playerName} got paid.`, "payday", 3600);
+    return;
+  }
+
+  if (eventType === "buyer") {
+    showEvent(title || "Buyer", message || `${playerName} found somebody interested.`, "default", 3800);
+    return;
+  }
+
+  if (eventType === "birthday") {
+    showEvent(title || "Birthday Tax", message || `${playerName} collected from everybody.`, "default", 3800);
+    return;
+  }
+
+  if (eventType === "charity" || eventType === "walk" || eventType === "ski" || eventType === "yardsale") {
+    showEvent(title || "Ouch", message || `${playerName} landed on a brutal tile.`, "default", 3800);
+    return;
+  }
+
+  if (!eventType || eventType === "default") {
+    showEvent(title || "Tile Hit", message || `${playerName} landed on something weird.`, "default", 3600);
   }
 }
 
@@ -808,10 +895,10 @@ async function showCardSequence(playerName, cards) {
 
     await wait(700);
     revealCard.classList.add("flipped");
-    await wait(5200);
+    await wait(CARD_READ_TIME);
   }
 
-  await wait(1200);
+  await wait(600);
   revealOverlay.classList.add("hidden");
 }
 
@@ -844,7 +931,7 @@ async function showPlaydaySequence(playerName, amount) {
   void playdayOverlay.offsetWidth;
   playdayOverlay.classList.add("show");
 
-  await wait(3200);
+  await wait(2600);
 
   playdayOverlay.classList.remove("show");
   await wait(450);
@@ -960,15 +1047,15 @@ socket.on("gameStarted", ({ room }) => {
   currentRoom = room;
   renderRoom(room);
   showScreen("game");
-  showEvent("Game Started", "The game has begun.", "default", 4500);
-  showGlobalAlert("🎲 PLAY-DAY STARTED 🎲", "Everybody lock in. The chaos begins now.", "chaos", 3200);
+  showEvent("Game Started", "The game has begun.", "default", 3000);
+  showGlobalAlert("🎲 PLAY-DAY STARTED 🎲", "Everybody lock in. The chaos begins now.", "chaos", 2300);
 });
 
 socket.on("turnUpdate", ({ currentPlayerId, currentPlayerName }) => {
   currentTurnPlayerId = currentPlayerId;
   sharedTurnRollAnimating = false;
   updateTurnUI();
-  showEvent("Next Turn", `${currentPlayerName}'s turn.`, "default", 4000);
+  showEvent("Next Turn", `${currentPlayerName}'s turn.`, "default", 2200);
 });
 
 socket.on("turnRolled", ({ playerName, roll }) => {
@@ -991,7 +1078,7 @@ socket.on("playdayPassed", async ({ playerName, amount, room }) => {
   updateTurnUI();
 
   playPaydaySound();
-  showGlobalAlert("💸 PAYDAYYYYY 💸", `${playerName} just scooped ${formatMoney(amount)}.`, "money", 3600);
+  showGlobalAlert("💸 PAYDAYYYYY 💸", `${playerName} just scooped ${formatMoney(amount)}.`, "money", 2300);
 
   await showPlaydaySequence(playerName, amount);
 });
@@ -1001,10 +1088,12 @@ socket.on("tileResult", async ({ title, message, room, eventType, landedPosition
   renderRoom(room);
   updateTurnUI();
 
+  const safePlayerName = playerName || "Someone";
+
   flashTile(landedPosition);
   pulseDeck(eventType);
-  maybePlayEventSound(eventType, cards);
-  maybeShowGlobalAlert({ playerName: playerName || "Someone", eventType, cards, title, message });
+  maybePlayEventSound(eventType, cards, title, message);
+  maybeShowGlobalAlert({ playerName: safePlayerName, eventType, cards, title, message });
 
   const chaosTier = detectChaosTier(eventType, cards, title, message);
   if (chaosTier === "heavy") {
@@ -1014,9 +1103,9 @@ socket.on("tileResult", async ({ title, message, room, eventType, landedPosition
   }
 
   if (cards && cards.length) {
-    await showCardSequence(playerName || "Someone", cards);
+    await showCardSequence(safePlayerName, cards);
   } else {
-    showEvent(title, message, eventType, 8000);
+    maybeShowTilePopup(eventType, title, message, safePlayerName);
   }
 });
 
@@ -1036,7 +1125,7 @@ socket.on("errorMessage", (message) => {
   } else if (rollScreen && !rollScreen.classList.contains("hidden")) {
     setRollMessage(message);
   } else {
-    showEvent("Error", message, "default", 7000);
+    showEvent("Error", message, "default", 5000);
   }
 });
 

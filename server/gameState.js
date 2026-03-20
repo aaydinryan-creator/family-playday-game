@@ -12,6 +12,12 @@ function createRoom(code, hostId) {
     decks: {
       mail: [],
       deal: []
+    },
+    cardDecks: {
+      mailDraw: [],
+      mailDiscard: [],
+      dealDraw: [],
+      dealDiscard: []
     }
   };
 }
@@ -25,7 +31,14 @@ function createPlayer(id, name, avatar) {
     avatar,
     connected: true,
     deals: [],
-    hand: []
+    hand: [],
+    inventory: {
+      items: []
+    },
+    stats: {
+      totalEarned: 0,
+      totalLost: 0
+    }
   };
 }
 

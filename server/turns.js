@@ -3,6 +3,9 @@ const { getCurrentPlayer, nextTurn } = require("./gameState");
 const { handleTile } = require("./gameLogic");
 
 const PLAYDAY_AMOUNT = 3500;
+const ROLL_ANIMATION_MS = 1100;
+const MOVE_ANIMATION_MS = 1150;
+const PRE_RESOLVE_PAUSE_MS = 350;
 
 function formatMoney(amount) {
   return `$${Number(amount || 0).toLocaleString()}`;
@@ -12,6 +15,39 @@ function safelyClampRoomBank(room, fallback = 50000) {
   if (!Number.isFinite(room.bank)) {
     room.bank = fallback;
   }
+}
+
+function getSafePlayer(player) {
+  return {
+    id: player.id,
+    name: player.name,
+    position: player.position,
+    cash: player.cash,
+    avatar: player.avatar,
+    connected: player.connected !== false,
+    deals: Array.isArray(player.deals) ? player.deals : [],
+    hand: Array.isArray(player.hand) ? player.hand : [],
+    inventory: {
+      items: Array.isArray(player.inventory?.items) ? player.inventory.items : []
+    },
+    stats: {
+      totalEarned: Number(player.stats?.totalEarned || 0),
+      totalLost: Number(player.stats?.totalLost || 0)
+    }
+  };
+}
+
+function getSafeRoomSnapshot(room) {
+  return {
+    code: room.code,
+    hostId: room.hostId,
+    phase: room.phase,
+    bank: room.bank,
+    turnIndex: room.turnIndex,
+    currentPlayerId: getCurrentPlayer(room)?.id || null,
+    players: room.players.map(getSafePlayer),
+    chat: Array.isArray(room.chat) ? room.chat.slice(-50) : []
+  };
 }
 
 function sendTurnUpdate(io, room) {
@@ -58,6 +94,10 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
       room.bank -= PLAYDAY_AMOUNT;
       safelyClampRoomBank(room);
 
+      if (player.stats) {
+        player.stats.totalEarned = Number(player.stats.totalEarned || 0) + PLAYDAY_AMOUNT;
+      }
+
       pushSystemMessage(
         room,
         `${player.name} hit PLAYDAY and collected ${formatMoney(PLAYDAY_AMOUNT)}.`
@@ -67,24 +107,7 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
         playerId: player.id,
         playerName: player.name,
         amount: PLAYDAY_AMOUNT,
-        room: {
-          code: room.code,
-          hostId: room.hostId,
-          phase: room.phase,
-          bank: room.bank,
-          turnIndex: room.turnIndex,
-          currentPlayerId: getCurrentPlayer(room)?.id || null,
-          players: room.players.map((p) => ({
-            id: p.id,
-            name: p.name,
-            position: p.position,
-            cash: p.cash,
-            avatar: p.avatar,
-            connected: p.connected !== false,
-            deals: Array.isArray(p.deals) ? p.deals : []
-          })),
-          chat: Array.isArray(room.chat) ? room.chat.slice(-40) : []
-        }
+        room: getSafeRoomSnapshot(room)
       });
     }
 
@@ -101,13 +124,27 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
     setTimeout(() => {
       room.phase = "resolving";
 
+      const beforeCash = Number(player.cash || 0);
+
       const result = handleTile(room, player, roll) || {
         title: "Tile",
         message: `${player.name} landed on a tile.`,
         tile: null,
         cards: [],
-        revealDuration: 2500
+        revealDuration: 3500,
+        soundCue: "tile_land"
       };
+
+      const afterCash = Number(player.cash || 0);
+      const delta = afterCash - beforeCash;
+
+      if (player.stats) {
+        if (delta > 0) {
+          player.stats.totalEarned = Number(player.stats.totalEarned || 0) + delta;
+        } else if (delta < 0) {
+          player.stats.totalLost = Number(player.stats.totalLost || 0) + Math.abs(delta);
+        }
+      }
 
       safelyClampRoomBank(room);
       pushSystemMessage(room, result.message);
@@ -119,33 +156,19 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
         landedPosition: player.position,
         playerName: player.name,
         cards: result.cards || [],
-        room: {
-          code: room.code,
-          hostId: room.hostId,
-          phase: room.phase,
-          bank: room.bank,
-          turnIndex: room.turnIndex,
-          currentPlayerId: getCurrentPlayer(room)?.id || null,
-          players: room.players.map((p) => ({
-            id: p.id,
-            name: p.name,
-            position: p.position,
-            cash: p.cash,
-            avatar: p.avatar,
-            connected: p.connected !== false,
-            deals: Array.isArray(p.deals) ? p.deals : []
-          })),
-          chat: Array.isArray(room.chat) ? room.chat.slice(-40) : []
-        }
+        revealDuration: result.revealDuration || 3500,
+        soundCue: result.soundCue || null,
+        cashDelta: delta,
+        room: getSafeRoomSnapshot(room)
       });
 
       emitRoomUpdate(io, room);
 
       setTimeout(() => {
         beginNextTurn(io, room, emitRoomUpdate);
-      }, result.revealDuration || 2500);
-    }, 1100);
-  }, 1000);
+      }, result.revealDuration || 3500);
+    }, MOVE_ANIMATION_MS + PRE_RESOLVE_PAUSE_MS);
+  }, ROLL_ANIMATION_MS);
 }
 
 module.exports = {

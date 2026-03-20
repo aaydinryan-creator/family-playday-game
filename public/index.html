@@ -179,7 +179,7 @@
           </div>
 
           <div class="sideCard mobilePlayersOrder">
-            <div class="deckHeader">PLAYERS</div>
+            <div class="deckHeader">PLAYERS / LEADERBOARD</div>
             <div id="gamePlayersList" class="moneyBoard"></div>
           </div>
         </div>
@@ -209,44 +209,172 @@
                 <div class="boardGrid">
 
                   <!-- ROW 1 -->
-                  <div class="tile startTile" data-pos="0"><span class="tileNum">1</span><span class="tileLabel">🚩 START</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="1"><span class="tileNum">2</span><span class="tileLabel">📬 MAILBOX MISERY</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="2"><span class="tileNum">3</span><span class="tileLabel">📬📬 DOUBLE MAIL</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="3"><span class="tileNum">4</span><span class="tileLabel">💰 SKETCHY DEAL</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="4"><span class="tileNum">5</span><span class="tileLabel">📬 MAILBOX MISERY</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="5"><span class="tileNum">6</span><span class="tileLabel">📩 BAD NEWS MAIL</span><div class="tilePieces"></div></div>
-                  <div class="tile lotteryTile" data-pos="6"><span class="tileNum">7</span><span class="tileLabel">🎰 LUCKY BS</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="7"><span class="tileNum">8</span><span class="tileLabel">📬 MAILBOX MISERY</span><div class="tilePieces"></div></div>
+                  <div class="tile startTile" data-pos="0">
+                    <span class="tileNum">1</span>
+                    <span class="tileLabel">🚩 START</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile mailTile" data-pos="1">
+                    <span class="tileNum">2</span>
+                    <span class="tileLabel">📬 MAIL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile mailTile" data-pos="2">
+                    <span class="tileNum">3</span>
+                    <span class="tileLabel">📬📬 DOUBLE MAIL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile dealTile" data-pos="3">
+                    <span class="tileNum">4</span>
+                    <span class="tileLabel">💰 DEAL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile" data-pos="4">
+                    <span class="tileNum">5</span>
+                    <span class="tileLabel">🧍 BUYER</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile mailTile" data-pos="5">
+                    <span class="tileNum">6</span>
+                    <span class="tileLabel">📬 MAIL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile lotteryTile" data-pos="6">
+                    <span class="tileNum">7</span>
+                    <span class="tileLabel">🎰 LUCKY BS</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile mailTile" data-pos="7">
+                    <span class="tileNum">8</span>
+                    <span class="tileLabel">📬 MAIL</span>
+                    <div class="tilePieces"></div>
+                  </div>
 
                   <!-- ROW 2 -->
-                  <div class="tile dealTile" data-pos="15"><span class="tileNum">16</span><span class="tileLabel">🛒 SOME DUMMY BUYS IT</span><div class="tilePieces"></div></div>
-                  <div class="tile lotteryTile" data-pos="14"><span class="tileNum">15</span><span class="tileLabel">🎰 LUCKY BS</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="13"><span class="tileNum">14</span><span class="tileLabel">📬 MAILBOX MISERY</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="12"><span class="tileNum">13</span><span class="tileLabel">🎂 BIRTHDAY TAX</span><div class="tilePieces"></div></div>
-                  <div class="tile paydayTile" data-pos="11"><span class="tileNum">12</span><span class="tileLabel">💸 SIDE HUSTLE</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="10"><span class="tileNum">11</span><span class="tileLabel">📬📬 DOUBLE MAIL</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="9"><span class="tileNum">10</span><span class="tileLabel">🛒 SOME DUMMY BUYS IT</span><div class="tilePieces"></div></div>
-                  <div class="tile radioTile" data-pos="8"><span class="tileNum">9</span><span class="tileLabel">📻 RADIO FLEX</span><div class="tilePieces"></div></div>
+                  <div class="tile" data-pos="15">
+                    <span class="tileNum">16</span>
+                    <span class="tileLabel">🧍 RANDOM BUYER</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile lotteryTile" data-pos="14">
+                    <span class="tileNum">15</span>
+                    <span class="tileLabel">🎰 LUCKY BS</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile mailTile" data-pos="13">
+                    <span class="tileNum">14</span>
+                    <span class="tileLabel">📬 MAIL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile" data-pos="12">
+                    <span class="tileNum">13</span>
+                    <span class="tileLabel">🎂 BIRTHDAY TAX</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile dealTile" data-pos="11">
+                    <span class="tileNum">12</span>
+                    <span class="tileLabel">💰 SKETCHY DEAL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile mailTile" data-pos="10">
+                    <span class="tileNum">11</span>
+                    <span class="tileLabel">📬📬 DOUBLE MAIL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile" data-pos="9">
+                    <span class="tileNum">10</span>
+                    <span class="tileLabel">🛒 SOME DUMMY BUYS IT</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile radioTile" data-pos="8">
+                    <span class="tileNum">9</span>
+                    <span class="tileLabel">📻 RADIO FLEX</span>
+                    <div class="tilePieces"></div>
+                  </div>
 
                   <!-- ROW 3 -->
-                  <div class="tile mailTile" data-pos="16"><span class="tileNum">17</span><span class="tileLabel">📬📬📬 TRIPLE MAIL HELL</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="17"><span class="tileNum">18</span><span class="tileLabel">📦 FB MARKETPLACE</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="18"><span class="tileNum">19</span><span class="tileLabel">📬 MAILBOX MISERY</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="19"><span class="tileNum">20</span><span class="tileLabel">🧍 RANDOM BUYER</span><div class="tilePieces"></div></div>
-                  <div class="tile lotteryTile" data-pos="20"><span class="tileNum">21</span><span class="tileLabel">🎰 LUCKY BS</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="21"><span class="tileNum">22</span><span class="tileLabel">🏌️ TOP GOLF</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="22"><span class="tileNum">23</span><span class="tileLabel">📬📬 DOUBLE MAIL</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="23"><span class="tileNum">24</span><span class="tileLabel">📉 BAD INVESTMENT</span><div class="tilePieces"></div></div>
+                  <div class="tile mailTile" data-pos="16">
+                    <span class="tileNum">17</span>
+                    <span class="tileLabel">📬📬📬 TRIPLE MAIL HELL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile dealTile" data-pos="17">
+                    <span class="tileNum">18</span>
+                    <span class="tileLabel">🤡 DUMB DEAL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile mailTile" data-pos="18">
+                    <span class="tileNum">19</span>
+                    <span class="tileLabel">📬 MAIL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile" data-pos="19">
+                    <span class="tileNum">20</span>
+                    <span class="tileLabel">📦 FB MARKETPLACE</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile lotteryTile" data-pos="20">
+                    <span class="tileNum">21</span>
+                    <span class="tileLabel">🎰 LUCKY BS</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile" data-pos="21">
+                    <span class="tileNum">22</span>
+                    <span class="tileLabel">🏌️ TOP GOLF</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile mailTile" data-pos="22">
+                    <span class="tileNum">23</span>
+                    <span class="tileLabel">📬📬 DOUBLE MAIL</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile dealTile" data-pos="23">
+                    <span class="tileNum">24</span>
+                    <span class="tileLabel">💸 SIDE HUSTLE</span>
+                    <div class="tilePieces"></div>
+                  </div>
 
                   <!-- ROW 4 -->
-                  <div class="tile paydayTile" data-pos="31"><span class="tileNum">32</span><span class="tileLabel">💰💰 BIG PAYDAY</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="30"><span class="tileNum">31</span><span class="tileLabel">🚶 WALK OF SUFFERING</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="29"><span class="tileNum">30</span><span class="tileLabel">🪑 YARD SALE NONSENSE</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="28"><span class="tileNum">29</span><span class="tileLabel">💀 PLEASE BUY THIS</span><div class="tilePieces"></div></div>
-                  <div class="tile dealTile" data-pos="27"><span class="tileNum">28</span><span class="tileLabel">🤡 DUMB DEAL</span><div class="tilePieces"></div></div>
-                  <div class="tile lotteryTile" data-pos="26"><span class="tileNum">27</span><span class="tileLabel">🎰 LUCKY BS</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="25"><span class="tileNum">26</span><span class="tileLabel">💸 FORCED CHARITY</span><div class="tilePieces"></div></div>
-                  <div class="tile mailTile" data-pos="24"><span class="tileNum">25</span><span class="tileLabel">📬 MAILBOX MISERY</span><div class="tilePieces"></div></div>
+                  <div class="tile paydayTile" data-pos="31">
+                    <span class="tileNum">32</span>
+                    <span class="tileLabel">💰💰 BIG PAYDAY</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile" data-pos="30">
+                    <span class="tileNum">31</span>
+                    <span class="tileLabel">🚶 WALK OF SUFFERING</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile" data-pos="29">
+                    <span class="tileNum">30</span>
+                    <span class="tileLabel">🪑 YARD SALE NONSENSE</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile" data-pos="28">
+                    <span class="tileNum">29</span>
+                    <span class="tileLabel">🪑 PLEASE BUY THIS</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile dealTile" data-pos="27">
+                    <span class="tileNum">28</span>
+                    <span class="tileLabel">💀 BAD INVESTMENT</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile lotteryTile" data-pos="26">
+                    <span class="tileNum">27</span>
+                    <span class="tileLabel">🎰 LUCKY BS</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile" data-pos="25">
+                    <span class="tileNum">26</span>
+                    <span class="tileLabel">💸 FORCED CHARITY</span>
+                    <div class="tilePieces"></div>
+                  </div>
+                  <div class="tile mailTile" data-pos="24">
+                    <span class="tileNum">25</span>
+                    <span class="tileLabel">📬 MAIL</span>
+                    <div class="tilePieces"></div>
+                  </div>
 
                 </div>
               </div>
