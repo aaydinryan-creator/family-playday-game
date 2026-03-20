@@ -784,15 +784,17 @@ function maybePlayEventSound(eventType, cards, title, message) {
   }
 }
 
-function maybeShowGlobalAlert({ playerName, eventType, cards, title, message }) {
+function maybeShowGlobalAlert({ playerName, eventType, cards, title, message, explicitAmount = null }) {
   const net = getCardNetAmount(cards);
   const chaosTier = detectChaosTier(eventType, cards, title, message);
   const lower = `${title || ""} ${message || ""}`.toLowerCase();
 
   if (eventType === "payday" || net >= 300) {
+    const paydayAmount = explicitAmount ?? (net > 0 ? net : 0);
+
     showGlobalAlert(
       "💰 PAYDAY CHA-CHING 💰",
-      `${playerName} just got paid ${formatMoney(net > 0 ? net : 300)}.`,
+      `${playerName} just got paid ${formatMoney(paydayAmount)}.`,
       "money"
     );
     return;
@@ -1083,7 +1085,7 @@ socket.on("playdayPassed", async ({ playerName, amount, room }) => {
   await showPlaydaySequence(playerName, amount);
 });
 
-socket.on("tileResult", async ({ title, message, room, eventType, landedPosition, cards, playerName }) => {
+socket.on("tileResult", async ({ title, message, room, eventType, landedPosition, cards, playerName, cashDelta }) => {
   currentRoom = room;
   renderRoom(room);
   updateTurnUI();
@@ -1093,7 +1095,14 @@ socket.on("tileResult", async ({ title, message, room, eventType, landedPosition
   flashTile(landedPosition);
   pulseDeck(eventType);
   maybePlayEventSound(eventType, cards, title, message);
-  maybeShowGlobalAlert({ playerName: safePlayerName, eventType, cards, title, message });
+  maybeShowGlobalAlert({
+    playerName: safePlayerName,
+    eventType,
+    cards,
+    title,
+    message,
+    explicitAmount: eventType === "payday" ? cashDelta : null
+  });
 
   const chaosTier = detectChaosTier(eventType, cards, title, message);
   if (chaosTier === "heavy") {

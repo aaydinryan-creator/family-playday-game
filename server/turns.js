@@ -76,7 +76,12 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   const roll = Math.floor(Math.random() * 6) + 1;
   const from = player.position;
   const rawTo = from + roll;
-  const passedPlayday = rawTo >= board.length;
+
+  // IMPORTANT FIX:
+  // Do not give the extra wrap-around PLAYDAY bonus if the player is already
+  // standing on the final payday tile and rolling off it.
+  const passedPlayday = rawTo >= board.length && from !== board.length - 1;
+
   const to = rawTo % board.length;
 
   io.to(room.code).emit("turnRolled", {
