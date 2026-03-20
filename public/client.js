@@ -1,4 +1,4 @@
-const socket = io();
+const socket = io("https://family-playday-game.onrender.com");
 
 let currentRoom = null;
 let myId = null;
