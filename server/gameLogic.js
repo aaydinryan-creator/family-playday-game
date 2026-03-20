@@ -89,6 +89,48 @@ const MAIL_CARDS = [
   {
     text: "Your tax refund came in a little stronger than expected. Collect $425.",
     amount: 425
+  },
+
+  // mean / no-money mail
+  {
+    text: "Just a letter that says: 'Hey fat fook, hope this finds you worse.' No cash. No bill. Just disrespect.",
+    amount: 0
+  },
+  {
+    text: "Birthday card from a relative. You open it... nothing falls out. Not even a gift card.",
+    amount: 0
+  },
+  {
+    text: "A handwritten note says: 'We were gonna send money but then we remembered you smell weird.'",
+    amount: 0
+  },
+  {
+    text: "You got fake inspirational mail that just says 'Keep going.' That's it. Useless.",
+    amount: 0
+  },
+  {
+    text: "A mystery envelope arrives. Inside is just a picture of a middle finger.",
+    amount: 0
+  },
+  {
+    text: "Someone mailed you coupons for things you will never buy. Your mailbox has been violated.",
+    amount: 0
+  },
+  {
+    text: "A card says 'Thinking of you.' That was already too much. No money inside.",
+    amount: 0
+  },
+  {
+    text: "You received hate mail from somebody who somehow knows your address. Impressive honestly.",
+    amount: 0
+  },
+  {
+    text: "Your friend mailed you a birthday card signed by their dog. Still no money.",
+    amount: 0
+  },
+  {
+    text: "You dyed your hair one color and now have to pay another $50 just to turn it back. Lose $100.",
+    amount: -100
   }
 ];
 
@@ -148,8 +190,50 @@ const DEAL_CARDS = [
   {
     text: "You found a collector willing to overpay for something useless. Collect $700.",
     amount: 700
+  },
+
+  // more ruthless deals
+  {
+    text: "You trusted a guy named Blaze on Marketplace. He sold you a 'rare collectible' that turned out to be trash. Lose $600.",
+    amount: -600
+  },
+  {
+    text: "You tried to flip a couch that smelled like death. Nobody wanted it. Lose $325.",
+    amount: -325
+  },
+  {
+    text: "You bought bulk energy drinks to resell and now your garage looks like a failed gas station. Lose $375.",
+    amount: -375
+  },
+  {
+    text: "You found a rare item at a yard sale and sold it to a collector for stupid money. Collect $900.",
+    amount: 900
+  },
+  {
+    text: "You paid for a 'business opportunity' from a dude in sunglasses indoors. Lose $700.",
+    amount: -700
+  },
+  {
+    text: "You sold some busted junk online with god-tier confidence. Somehow it worked. Collect $600.",
+    amount: 600
+  },
+  {
+    text: "You bought a mystery storage unit thinking you were on TV. It was just towels and sadness. Lose $550.",
+    amount: -550
+  },
+  {
+    text: "You flipped a rusty tool set to some hipster who called it authentic. Collect $525.",
+    amount: 525
   }
 ];
+
+function applyCardAmount(player, room, amount) {
+  if (amount > 0) {
+    addMoney(player, room, amount);
+  } else if (amount < 0) {
+    removeMoney(player, room, Math.abs(amount));
+  }
+}
 
 function drawMailCards(player, room, count) {
   const cards = [];
@@ -158,12 +242,7 @@ function drawMailCards(player, room, count) {
   for (let i = 0; i < count; i += 1) {
     const card = randomFrom(MAIL_CARDS);
 
-    if (card.amount >= 0) {
-      addMoney(player, room, card.amount);
-    } else {
-      removeMoney(player, room, Math.abs(card.amount));
-    }
-
+    applyCardAmount(player, room, card.amount);
     total += card.amount;
 
     cards.push({
@@ -180,11 +259,7 @@ function drawMailCards(player, room, count) {
 function drawDealCard(player, room) {
   const card = randomFrom(DEAL_CARDS);
 
-  if (card.amount >= 0) {
-    addMoney(player, room, card.amount);
-  } else {
-    removeMoney(player, room, Math.abs(card.amount));
-  }
+  applyCardAmount(player, room, card.amount);
 
   return {
     cards: [
@@ -200,8 +275,8 @@ function drawDealCard(player, room) {
 }
 
 function getRevealDuration(cards) {
-  if (!cards || !cards.length) return 2600;
-  return cards.length * 2200 + 900;
+  if (!cards || !cards.length) return 4200;
+  return cards.length * 3500 + 1400;
 }
 
 function handleTile(room, player, roll) {
@@ -213,7 +288,7 @@ function handleTile(room, player, roll) {
       message: `${player.name} landed on something weird...`,
       tile: null,
       cards: [],
-      revealDuration: 2200
+      revealDuration: 3000
     };
   }
 
@@ -226,10 +301,12 @@ function handleTile(room, player, roll) {
       const result = drawMailCards(player, room, tile.count || 1);
       cards = result.cards;
 
-      if (result.total >= 0) {
-        message = `${player.name} checked the mail and came out up ${formatMoney(result.total)}.`;
-      } else {
+      if (result.total > 0) {
+        message = `${player.name} checked the mail and somehow came out up ${formatMoney(result.total)}.`;
+      } else if (result.total < 0) {
         message = `${player.name} checked the mail and got cooked for ${formatMoney(Math.abs(result.total))}.`;
+      } else {
+        message = `${player.name} checked the mail and received absolutely no financial benefit whatsoever.`;
       }
 
       break;
