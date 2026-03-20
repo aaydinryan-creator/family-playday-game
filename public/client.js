@@ -2,13 +2,9 @@ const socket = io();
 
 let currentRoom = null;
 let myId = null;
-let hasRolled = false;
-let rollingInterval = null;
-let sharedRollingInterval = null;
-let finalRollLocked = false;
 let currentTurnPlayerId = null;
 let eventTimeout = null;
-let orderRollAnimating = false;
+let sharedRollingInterval = null;
 let sharedTurnRollAnimating = false;
 
 const EMOJI_OPTIONS = ["😎", "🤠", "😈", "👽", "🤖", "🐸", "🦊", "🐵", "🐼", "🦄"];
@@ -103,8 +99,11 @@ const musicToggleBtn = document.getElementById("musicToggleBtn");
 function ensureAudioContext() {
   if (!audioContext) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (Ctx) audioContext = new Ctx();
+    if (Ctx) {
+      audioContext = new Ctx();
+    }
   }
+
   if (audioContext && audioContext.state === "suspended") {
     audioContext.resume().catch(() => {});
   }
@@ -162,14 +161,17 @@ function toggleMusic() {
 
   if (musicEnabled) {
     ensureAudioContext();
+
     if (bgMusic) {
       bgMusic.volume = 0.18;
-      bgMusic.play().then(() => {
-        musicStarted = true;
-        updateMusicButton();
-      }).catch(() => {
-        updateMusicButton();
-      });
+      bgMusic.play()
+        .then(() => {
+          musicStarted = true;
+          updateMusicButton();
+        })
+        .catch(() => {
+          updateMusicButton();
+        });
     } else {
       updateMusicButton();
     }
@@ -180,27 +182,27 @@ function toggleMusic() {
 }
 
 function showScreen(screenName) {
-  menuScreen.classList.add("hidden");
-  lobbyScreen.classList.add("hidden");
-  rollScreen.classList.add("hidden");
-  gameScreen.classList.add("hidden");
+  menuScreen?.classList.add("hidden");
+  lobbyScreen?.classList.add("hidden");
+  rollScreen?.classList.add("hidden");
+  gameScreen?.classList.add("hidden");
 
-  if (screenName === "menu") menuScreen.classList.remove("hidden");
-  if (screenName === "lobby") lobbyScreen.classList.remove("hidden");
-  if (screenName === "roll") rollScreen.classList.remove("hidden");
-  if (screenName === "game") gameScreen.classList.remove("hidden");
+  if (screenName === "menu") menuScreen?.classList.remove("hidden");
+  if (screenName === "lobby") lobbyScreen?.classList.remove("hidden");
+  if (screenName === "roll") rollScreen?.classList.remove("hidden");
+  if (screenName === "game") gameScreen?.classList.remove("hidden");
 }
 
 function setMessage(text) {
-  messageEl.textContent = text || "";
+  if (messageEl) messageEl.textContent = text || "";
 }
 
 function setLobbyMessage(text) {
-  lobbyMessageEl.textContent = text || "";
+  if (lobbyMessageEl) lobbyMessageEl.textContent = text || "";
 }
 
 function setRollMessage(text) {
-  rollMessageEl.textContent = text || "";
+  if (rollMessageEl) rollMessageEl.textContent = text || "";
 }
 
 function formatMoney(amount) {
@@ -225,14 +227,16 @@ function createAvatarMarkup(avatar, extraClass = "") {
   const hat = safeAvatar.hat === "❌" ? "" : safeAvatar.hat;
 
   return `
-    <div class="avatarPiece ${extraClass}" style="--piece-color:${escapeHtml(safeAvatar.color)}">
+    <div class="avatarPiece ${extraClass}" style="--piece-color:${escapeHtml(safeAvatar.color || "#4fd081")}">
       <span class="avatarHat">${escapeHtml(hat)}</span>
-      <span class="avatarEmoji">${escapeHtml(safeAvatar.emoji)}</span>
+      <span class="avatarEmoji">${escapeHtml(safeAvatar.emoji || "😎")}</span>
     </div>
   `;
 }
 
 function renderAvatarPicker() {
+  if (!emojiChoices || !hatChoices || !colorChoices || !avatarPreview) return;
+
   emojiChoices.innerHTML = EMOJI_OPTIONS.map((emoji) => `
     <button
       type="button"
@@ -298,48 +302,50 @@ function initAvatarPicker() {
 }
 
 function renderRoom(room) {
+  if (!room) return;
+
   currentRoom = room;
 
-  roomCodeDisplay.textContent = room.code;
-  rollRoomCodeDisplay.textContent = room.code;
-  gameRoomCodeShort.textContent = room.code;
-  bankAmount.textContent = formatMoney(room.bank);
+  if (roomCodeDisplay) roomCodeDisplay.textContent = room.code || "----";
+  if (rollRoomCodeDisplay) rollRoomCodeDisplay.textContent = room.code || "----";
+  if (gameRoomCodeShort) gameRoomCodeShort.textContent = room.code || "----";
+  if (bankAmount) bankAmount.textContent = formatMoney(room.bank);
 
   renderPlayers(room);
-  renderGameMoneyBoard(room.players);
+  renderGameMoneyBoard(room.players || []);
   renderChat(room.chat || []);
-  renderBoardPieces(room.players);
+  renderBoardPieces(room.players || []);
 
-  if (myId === room.hostId && room.phase === "lobby") {
-    startGameBtn.classList.remove("hidden");
-  } else {
-    startGameBtn.classList.add("hidden");
+  if (startGameBtn) {
+    const amHost = room.players?.[0]?.id === myId;
+    if (amHost && room.phase === "lobby") {
+      startGameBtn.classList.remove("hidden");
+    } else {
+      startGameBtn.classList.add("hidden");
+    }
   }
 
-  const me = room.players.find((player) => player.id === myId);
-  hasRolled = !!(me && me.roll !== null);
-
-  if (room.phase === "roll") {
-    rollBtn.disabled = hasRolled || finalRollLocked || orderRollAnimating;
+  if (room.phase === "lobby") {
+    showScreen("lobby");
+  } else if (room.phase === "game" || room.phase === "roll" || room.phase === "moving" || room.phase === "resolving") {
+    showScreen("game");
   }
 }
 
 function renderPlayers(room) {
+  if (!playerList) return;
+
   playerList.innerHTML = "";
 
-  room.players.forEach((player) => {
+  (room.players || []).forEach((player, index) => {
     const li = document.createElement("li");
 
-    const hostBadge = player.id === room.hostId
+    const hostBadge = index === 0
       ? `<span class="hostTag">HOST</span>`
       : "";
 
     const youBadge = player.id === myId
       ? `<span class="youTag">YOU</span>`
-      : "";
-
-    const rolledBadge = room.phase === "roll" && player.roll !== null
-      ? `<span class="rolledTag">ROLLED ${player.roll}</span>`
       : "";
 
     li.innerHTML = `
@@ -350,7 +356,6 @@ function renderPlayers(room) {
       <div class="playerTags">
         ${hostBadge}
         ${youBadge}
-        ${rolledBadge}
       </div>
     `;
 
@@ -359,6 +364,8 @@ function renderPlayers(room) {
 }
 
 function renderGameMoneyBoard(players) {
+  if (!gamePlayersList) return;
+
   gamePlayersList.innerHTML = "";
 
   players.forEach((player) => {
@@ -406,56 +413,29 @@ function renderChat(chatItems) {
     `;
   }).join("");
 
-  lobbyChatList.innerHTML = html;
-  gameChatList.innerHTML = html;
+  if (lobbyChatList) {
+    lobbyChatList.innerHTML = html;
+    lobbyChatList.scrollTop = lobbyChatList.scrollHeight;
+  }
 
-  lobbyChatList.scrollTop = lobbyChatList.scrollHeight;
-  gameChatList.scrollTop = gameChatList.scrollHeight;
+  if (gameChatList) {
+    gameChatList.innerHTML = html;
+    gameChatList.scrollTop = gameChatList.scrollHeight;
+  }
 }
 
 function sendChatMessageFromInput(inputEl) {
+  if (!inputEl) return;
   const text = inputEl.value.trim();
   if (!text) return;
+
   socket.emit("sendChatMessage", { text });
   inputEl.value = "";
 }
 
-function setDiceFace(value) {
-  const faceTransforms = {
-    1: "rotateX(0deg) rotateY(0deg)",
-    2: "rotateX(0deg) rotateY(-90deg)",
-    3: "rotateX(0deg) rotateY(-180deg)",
-    4: "rotateX(0deg) rotateY(90deg)",
-    5: "rotateX(-90deg) rotateY(0deg)",
-    6: "rotateX(90deg) rotateY(0deg)"
-  };
-
-  dice.classList.remove("rolling");
-  dice.style.transform = faceTransforms[value] || faceTransforms[1];
-}
-
-function startDiceAnimation() {
-  clearInterval(rollingInterval);
-  playDiceRollSound(1100);
-  dice.classList.add("rolling");
-
-  let fakeValue = 1;
-  diceValueText.textContent = "Rolling...";
-
-  rollingInterval = setInterval(() => {
-    fakeValue = (fakeValue % 6) + 1;
-    setDiceFace(fakeValue);
-  }, 120);
-}
-
-function stopDiceAnimationWithValue(value) {
-  clearInterval(rollingInterval);
-  dice.classList.remove("rolling");
-  setDiceFace(value);
-  diceValueText.textContent = `You rolled a ${value}!`;
-}
-
 function setSharedDiceFace(value) {
+  if (!sharedDiceCube) return;
+
   const faceTransforms = {
     1: "rotateX(0deg) rotateY(0deg)",
     2: "rotateX(0deg) rotateY(-90deg)",
@@ -470,8 +450,11 @@ function setSharedDiceFace(value) {
 }
 
 function showSharedDice(titleText) {
+  if (!sharedDiceOverlay || !sharedDiceTitle || !sharedDiceValue || !sharedDiceCube) return;
+
   clearInterval(sharedRollingInterval);
   playDiceRollSound(1200);
+
   sharedDiceTitle.textContent = titleText;
   sharedDiceValue.textContent = "Rolling...";
   sharedDiceOverlay.classList.remove("hidden");
@@ -485,6 +468,8 @@ function showSharedDice(titleText) {
 }
 
 function stopSharedDice(value, playerName) {
+  if (!sharedDiceCube || !sharedDiceValue || !sharedDiceOverlay) return;
+
   clearInterval(sharedRollingInterval);
   sharedDiceCube.classList.remove("rolling");
   setSharedDiceFace(value);
@@ -496,6 +481,8 @@ function stopSharedDice(value, playerName) {
 }
 
 function clearPopupTheme() {
+  if (!eventPopup) return;
+
   eventPopup.classList.remove(
     "mailEvent",
     "dealEvent",
@@ -508,6 +495,8 @@ function clearPopupTheme() {
 }
 
 function showEvent(title, message, type = "default", duration = 3000) {
+  if (!eventPopup || !eventTitle || !eventMessage) return;
+
   clearTimeout(eventTimeout);
 
   eventTitle.textContent = title || "Event";
@@ -567,6 +556,8 @@ function getAmountLabel(amount) {
 }
 
 function setRevealTheme(type) {
+  if (!revealCard) return;
+
   revealCard.classList.remove("revealMail", "revealDeal", "revealDefault");
   if (type === "mail") revealCard.classList.add("revealMail");
   else if (type === "deal") revealCard.classList.add("revealDeal");
@@ -575,6 +566,7 @@ function setRevealTheme(type) {
 
 async function showCardSequence(playerName, cards) {
   if (!cards || !cards.length) return;
+  if (!revealOverlay || !revealPlayer || !revealCount || !revealFrontTitle || !revealFrontText || !revealAmount || !revealCard) return;
 
   revealOverlay.classList.remove("hidden");
   revealPlayer.textContent = `${playerName} drew a card`;
@@ -620,7 +612,7 @@ function spawnPlaydayMoney() {
 }
 
 async function showPlaydaySequence(playerName, amount) {
-  if (!playdayOverlay) return;
+  if (!playdayOverlay || !playdayTitle || !playdayText) return;
 
   spawnPlaydayMoney();
   playdayTitle.textContent = "PLAYDAYYYY";
@@ -640,16 +632,22 @@ async function showPlaydaySequence(playerName, amount) {
 function updateTurnUI() {
   if (!currentRoom) return;
 
-  const player = currentRoom.players.find((p) => p.id === currentTurnPlayerId);
+  const player = currentRoom.players?.find((p) => p.id === currentTurnPlayerId);
   const name = player ? player.name : "Waiting...";
 
-  currentTurnText.textContent = name;
-  turnInfoText.textContent =
-    currentTurnPlayerId === myId
-      ? "It is your turn. Press Roll Turn."
-      : `${name} is taking their turn.`;
+  if (currentTurnText) currentTurnText.textContent = name;
 
-  rollTurnBtn.disabled = currentTurnPlayerId !== myId || sharedTurnRollAnimating;
+  if (turnInfoText) {
+    turnInfoText.textContent =
+      currentTurnPlayerId === myId
+        ? "It is your turn. Press Roll Turn."
+        : `${name} is taking their turn.`;
+  }
+
+  if (rollTurnBtn) {
+    rollTurnBtn.disabled = currentTurnPlayerId !== myId || sharedTurnRollAnimating;
+  }
+
   renderBoardPieces(currentRoom.players || []);
 }
 
@@ -658,136 +656,82 @@ function primeAudioAndMusic() {
   tryStartMusic();
 }
 
-createRoomBtn.addEventListener("click", () => {
+createRoomBtn?.addEventListener("click", () => {
   primeAudioAndMusic();
   setMessage("");
+
   socket.emit("createRoom", {
-    name: nameInput.value,
+    name: nameInput?.value || "",
     avatar: getSelectedAvatar()
   });
 });
 
-joinRoomBtn.addEventListener("click", () => {
+joinRoomBtn?.addEventListener("click", () => {
   primeAudioAndMusic();
   setMessage("");
+
   socket.emit("joinRoom", {
-    name: nameInput.value,
-    roomCode: roomCodeInput.value,
+    name: nameInput?.value || "",
+    roomCode: roomCodeInput?.value || "",
     avatar: getSelectedAvatar()
   });
 });
 
-startGameBtn.addEventListener("click", () => {
+startGameBtn?.addEventListener("click", () => {
   primeAudioAndMusic();
   setLobbyMessage("");
   socket.emit("startGame");
 });
 
-leaveLobbyBtn.addEventListener("click", () => {
+leaveLobbyBtn?.addEventListener("click", () => {
   window.location.reload();
 });
 
-rollBtn.addEventListener("click", () => {
-  primeAudioAndMusic();
-  setRollMessage("");
-  if (hasRolled || finalRollLocked || orderRollAnimating) return;
-  socket.emit("rollForOrder");
+rollBtn?.addEventListener("click", () => {
+  setRollMessage("This phase is no longer used in this version.");
 });
 
-rollTurnBtn.addEventListener("click", () => {
+rollTurnBtn?.addEventListener("click", () => {
   primeAudioAndMusic();
   if (currentTurnPlayerId !== myId || sharedTurnRollAnimating) return;
   socket.emit("rollTurn");
 });
 
-sendLobbyChatBtn.addEventListener("click", () => {
+sendLobbyChatBtn?.addEventListener("click", () => {
   sendChatMessageFromInput(lobbyChatInput);
 });
 
-sendGameChatBtn.addEventListener("click", () => {
+sendGameChatBtn?.addEventListener("click", () => {
   sendChatMessageFromInput(gameChatInput);
 });
 
-if (musicToggleBtn) {
-  musicToggleBtn.addEventListener("click", () => {
-    ensureAudioContext();
-    toggleMusic();
-  });
-}
+musicToggleBtn?.addEventListener("click", () => {
+  ensureAudioContext();
+  toggleMusic();
+});
 
-lobbyChatInput.addEventListener("keydown", (event) => {
+lobbyChatInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") sendChatMessageFromInput(lobbyChatInput);
 });
 
-gameChatInput.addEventListener("keydown", (event) => {
+gameChatInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") sendChatMessageFromInput(gameChatInput);
 });
 
-roomCodeInput.addEventListener("input", () => {
+roomCodeInput?.addEventListener("input", () => {
   roomCodeInput.value = roomCodeInput.value.toUpperCase();
 });
 
 socket.on("roomJoined", ({ room, yourId }) => {
   myId = yourId;
   renderRoom(room);
-  showScreen("lobby");
+  showScreen(room.phase === "lobby" ? "lobby" : "game");
 });
 
 socket.on("roomUpdated", (room) => {
   currentRoom = room;
   renderRoom(room);
   updateTurnUI();
-});
-
-socket.on("startRollPhase", (room) => {
-  currentRoom = room;
-  renderRoom(room);
-  rollResults.innerHTML = "";
-  turnOrderResults.innerHTML = "";
-  setRollMessage("");
-  finalRollLocked = false;
-  orderRollAnimating = false;
-  diceValueText.textContent = "Waiting to roll...";
-  setDiceFace(1);
-  showScreen("roll");
-});
-
-socket.on("orderRollStarted", ({ playerName }) => {
-  orderRollAnimating = true;
-  rollBtn.disabled = true;
-  startDiceAnimation();
-  diceValueText.textContent = `${playerName} is rolling...`;
-});
-
-socket.on("playerRolled", ({ id, name, roll }) => {
-  const line = document.createElement("div");
-  line.className = "resultLine";
-  line.textContent = `${name} rolled ${roll}`;
-  rollResults.appendChild(line);
-
-  stopDiceAnimationWithValue(roll);
-  orderRollAnimating = false;
-
-  if (id === myId) {
-    hasRolled = true;
-    diceValueText.textContent = `You rolled a ${roll}!`;
-  } else {
-    diceValueText.textContent = `${name} rolled a ${roll}!`;
-  }
-});
-
-socket.on("finalOrder", (players) => {
-  finalRollLocked = true;
-  rollBtn.disabled = true;
-
-  turnOrderResults.innerHTML = "<h3>Turn Order</h3>";
-
-  players.forEach((player, index) => {
-    const line = document.createElement("div");
-    line.className = "resultLine";
-    line.textContent = `${index + 1}. ${player.name} (${player.roll})`;
-    turnOrderResults.appendChild(line);
-  });
 });
 
 socket.on("gameStarted", ({ room }) => {
@@ -804,14 +748,14 @@ socket.on("turnUpdate", ({ currentPlayerId, currentPlayerName }) => {
   showEvent("Next Turn", `${currentPlayerName}'s turn.`, "default", 2000);
 });
 
-socket.on("sharedTurnRollStarted", ({ playerName }) => {
+socket.on("turnRolled", ({ playerName, roll }) => {
   sharedTurnRollAnimating = true;
   updateTurnUI();
   showSharedDice(`${playerName} is rolling`);
-});
 
-socket.on("turnRolled", ({ playerName, roll }) => {
-  stopSharedDice(roll, playerName);
+  setTimeout(() => {
+    stopSharedDice(roll, playerName);
+  }, 1000);
 });
 
 socket.on("playerMoved", ({ playerName, from, to, roll }) => {
@@ -829,6 +773,7 @@ socket.on("tileResult", async ({ title, message, room, eventType, landedPosition
   currentRoom = room;
   renderRoom(room);
   updateTurnUI();
+
   flashTile(landedPosition);
   pulseDeck(eventType);
 
@@ -840,23 +785,20 @@ socket.on("tileResult", async ({ title, message, room, eventType, landedPosition
 });
 
 socket.on("errorMessage", (message) => {
-  clearInterval(rollingInterval);
   clearInterval(sharedRollingInterval);
-  dice.classList.remove("rolling");
-  sharedDiceCube.classList.remove("rolling");
-  sharedDiceOverlay.classList.add("hidden");
-  orderRollAnimating = false;
-  sharedTurnRollAnimating = false;
 
-  if (!menuScreen.classList.contains("hidden")) {
+  if (sharedDiceCube) sharedDiceCube.classList.remove("rolling");
+  if (sharedDiceOverlay) sharedDiceOverlay.classList.add("hidden");
+
+  sharedTurnRollAnimating = false;
+  updateTurnUI();
+
+  if (menuScreen && !menuScreen.classList.contains("hidden")) {
     setMessage(message);
-  } else if (!lobbyScreen.classList.contains("hidden")) {
+  } else if (lobbyScreen && !lobbyScreen.classList.contains("hidden")) {
     setLobbyMessage(message);
-  } else if (!rollScreen.classList.contains("hidden")) {
+  } else if (rollScreen && !rollScreen.classList.contains("hidden")) {
     setRollMessage(message);
-    finalRollLocked = false;
-    rollBtn.disabled = hasRolled;
-    diceValueText.textContent = "Waiting to roll...";
   } else {
     showEvent("Error", message, "default");
   }

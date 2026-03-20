@@ -1,7 +1,7 @@
 const board = require("./board");
 
 function formatMoney(amount) {
-  return `$${amount.toLocaleString()}`;
+  return `$${Number(amount || 0).toLocaleString()}`;
 }
 
 function getTileAtPosition(position) {
@@ -9,109 +9,155 @@ function getTileAtPosition(position) {
   return board[position];
 }
 
+// Safe money transfer (prevents weird negatives/crashes)
+function addMoney(player, room, amount) {
+  player.cash += amount;
+  room.bank -= amount;
+}
+
+function removeMoney(player, room, amount) {
+  player.cash -= amount;
+  room.bank += amount;
+}
+
 function handleTile(room, player, roll) {
   const tile = getTileAtPosition(player.position);
+
   if (!tile) {
     return {
       title: "Unknown Tile",
-      message: `${player.name} landed on an unknown tile.`,
+      message: `${player.name} landed on something weird...`,
       tile
     };
   }
 
   let title = tile.label || tile.type;
-  let message = `${player.name} landed on ${tile.label || tile.type}.`;
+  let message = `${player.name} landed on ${tile.label}.`;
 
   switch (tile.type) {
+
+    // =========================
+    // MAIL
+    // =========================
     case "mail":
-      message = `${player.name} landed on MAIL and draws ${tile.count} card${tile.count > 1 ? "s" : ""}.`;
+      message = `${player.name} checks the MAIL (${tile.count} card${tile.count > 1 ? "s" : ""}).`;
       break;
 
+    // =========================
+    // SWEEPSTAKES
+    // =========================
     case "sweepstakes":
-      player.cash += tile.amount;
-      room.bank -= tile.amount;
-      message = `${player.name} won ${formatMoney(tile.amount)} from the bank in Sweepstakes.`;
+      addMoney(player, room, tile.amount);
+      message = `${player.name} won ${formatMoney(tile.amount)} in Sweepstakes!`;
       break;
 
+    // =========================
+    // DEAL
+    // =========================
     case "deal":
-      message = `${player.name} landed on DEAL and can draw a deal card later.`;
+      message = `${player.name} can draw a DEAL card. Big risk 👀`;
       break;
 
-    case "lottery":
-      room.bank += 1000;
-      message = `${player.name} triggered the Lottery. The bank adds ${formatMoney(1000)} to the pot.`;
+    // =========================
+    // LOTTERY
+    // =========================
+    case "lottery": {
+      const win = 500;
+      addMoney(player, room, win);
+      message = `${player.name} won ${formatMoney(win)} in the Lottery!`;
       break;
+    }
 
+    // =========================
+    // RADIO
+    // =========================
     case "radio":
-      player.cash += tile.amount;
-      room.bank -= tile.amount;
-      message = `${player.name} won the Radio Contest and gets ${formatMoney(tile.amount)}.`;
+      addMoney(player, room, tile.amount);
+      message = `${player.name} won the radio contest (${formatMoney(tile.amount)})`;
       break;
 
+    // =========================
+    // BUYER
+    // =========================
     case "buyer":
-      message = `${player.name} found a buyer. If they own a deal later, this can be used to sell it.`;
+      message = `${player.name} found a buyer. Hope you got something to sell...`;
       break;
 
+    // =========================
+    // BIRTHDAY
+    // =========================
     case "birthday": {
-      let totalReceived = 0;
+      let total = 0;
 
-      room.players.forEach((otherPlayer) => {
-        if (otherPlayer.id !== player.id) {
-          otherPlayer.cash -= tile.amountPerPlayer;
+      room.players.forEach((p) => {
+        if (p.id !== player.id) {
+          p.cash -= tile.amountPerPlayer;
           player.cash += tile.amountPerPlayer;
-          totalReceived += tile.amountPerPlayer;
+          total += tile.amountPerPlayer;
         }
       });
 
-      message = `${player.name} landed on Happy Birthday and collects ${formatMoney(totalReceived)} from the other players.`;
+      message = `${player.name} had a birthday and collected ${formatMoney(total)} 🎉`;
       break;
     }
 
+    // =========================
+    // SKI
+    // =========================
     case "ski":
-      player.cash -= tile.cost;
-      room.bank += tile.cost;
-      message = `${player.name} paid ${formatMoney(tile.cost)} for Super Ski Sunday.`;
+      removeMoney(player, room, tile.cost);
+      message = `${player.name} paid ${formatMoney(tile.cost)} for skiing ❄️`;
       break;
 
+    // =========================
+    // CHARITY
+    // =========================
     case "charity":
-      player.cash -= tile.cost;
-      room.bank += tile.cost;
-      message = `${player.name} paid ${formatMoney(tile.cost)} for Charity Concert.`;
+      removeMoney(player, room, tile.cost);
+      message = `${player.name} donated ${formatMoney(tile.cost)} ❤️`;
       break;
 
+    // =========================
+    // YARD SALE
+    // =========================
     case "yardsale": {
-      const yardSaleCost = roll * 100;
-      player.cash -= yardSaleCost;
-      room.bank += yardSaleCost;
-      message = `${player.name} rolled a ${roll} at Yard Sale and paid ${formatMoney(yardSaleCost)}.`;
+      const cost = roll * 100;
+      removeMoney(player, room, cost);
+      message = `${player.name} paid ${formatMoney(cost)} at a yard sale (rolled ${roll})`;
       break;
     }
 
+    // =========================
+    // WALK FOR CHARITY
+    // =========================
     case "walk": {
-      let totalCollected = 0;
+      let total = 0;
 
-      room.players.forEach((otherPlayer) => {
-        if (otherPlayer.id !== player.id) {
-          const charityRoll = Math.floor(Math.random() * 6) + 1;
-          const payAmount = charityRoll * 100;
-          otherPlayer.cash -= payAmount;
-          room.bank += payAmount;
-          totalCollected += payAmount;
+      room.players.forEach((p) => {
+        if (p.id !== player.id) {
+          const r = Math.floor(Math.random() * 6) + 1;
+          const amount = r * 100;
+
+          p.cash -= amount;
+          room.bank += amount;
+          total += amount;
         }
       });
 
-      message = `${player.name} triggered Walk for Charity. Other players paid a total of ${formatMoney(totalCollected)} into the pot.`;
+      message = `${player.name} triggered charity walk. Others paid ${formatMoney(total)} 💀`;
       break;
     }
 
+    // =========================
+    // PAYDAY
+    // =========================
     case "payday":
-      player.cash += tile.salary;
-      room.bank -= tile.salary;
-      message = `${player.name} reached PAY DAY and collects ${formatMoney(tile.salary)} salary.`;
+      addMoney(player, room, tile.salary);
+      message = `${player.name} hit PAYDAY and earned ${formatMoney(tile.salary)} 💰`;
       break;
 
     default:
-      message = `${player.name} landed on ${tile.label || tile.type}.`;
+      message = `${player.name} landed on ${tile.label}.`;
       break;
   }
 

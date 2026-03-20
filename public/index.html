@@ -1,553 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0"
-  >
-  <title>PLAY-DAY</title>
-  <link rel="stylesheet" href="styles.css">
-  <style>
-    .playdayOverlay {
-      position: fixed;
-      inset: 0;
-      z-index: 99999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background:
-        radial-gradient(circle at center, rgba(255, 221, 87, 0.22), rgba(0, 0, 0, 0.88) 55%),
-        rgba(0, 0, 0, 0.82);
-      overflow: hidden;
-      opacity: 0;
-      transform: scale(1.03);
-      pointer-events: none;
-      transition: opacity 0.28s ease, transform 0.28s ease;
-    }
-
-    .playdayOverlay.show {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    .playdayRain {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      pointer-events: none;
-    }
-
-    .playdayMoney {
-      position: absolute;
-      top: -12%;
-      color: #ffd54a;
-      text-shadow:
-        0 0 8px rgba(255, 214, 74, 0.75),
-        0 0 18px rgba(255, 214, 74, 0.5);
-      animation-name: playdayFall;
-      animation-timing-function: linear;
-      animation-iteration-count: 1;
-      user-select: none;
-    }
-
-    @keyframes playdayFall {
-      0% {
-        transform: translateY(-10vh) rotate(0deg);
-        opacity: 0;
-      }
-      10% {
-        opacity: 1;
-      }
-      100% {
-        transform: translateY(120vh) rotate(360deg);
-        opacity: 0.95;
-      }
-    }
-
-    .playdayContent {
-      position: relative;
-      z-index: 2;
-      text-align: center;
-      padding: 28px 20px;
-      max-width: 90vw;
-    }
-
-    .playdayTitle {
-      margin: 0;
-      font-size: clamp(42px, 10vw, 108px);
-      font-weight: 900;
-      line-height: 0.95;
-      letter-spacing: 0.06em;
-      color: #ffd54a;
-      text-shadow:
-        0 3px 0 #8c6b00,
-        0 10px 25px rgba(0, 0, 0, 0.45),
-        0 0 30px rgba(255, 213, 74, 0.35);
-      animation: playdayPop 0.45s ease;
-    }
-
-    .playdaySub {
-      margin-top: 16px;
-      font-size: clamp(18px, 3vw, 34px);
-      font-weight: 800;
-      color: #ffffff;
-      text-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-      animation: playdayPop 0.55s ease;
-    }
-
-    @keyframes playdayPop {
-      0% {
-        transform: scale(0.75);
-        opacity: 0;
-      }
-      100% {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <title>PLAYDAY</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <audio id="bgMusic" loop preload="auto">
-    <source src="money-song.mp3" type="audio/mpeg">
-  </audio>
 
-  <div id="moneyBg" aria-hidden="true">
-    <span class="cash cash1">$</span>
-    <span class="cash cash2">$</span>
-    <span class="cash cash3">$</span>
-    <span class="cash cash4">$</span>
-    <span class="cash cash5">$</span>
-    <span class="cash cash6">$</span>
-    <span class="cash cash7">$</span>
-    <span class="cash cash8">$</span>
+<div id="menuScreen" class="screen">
+  <div class="panel glamPanel">
+    <h1 class="gameTitle">PLAYDAY</h1>
+
+    <input id="nameInput" placeholder="Your name" />
+    <input id="roomCodeInput" placeholder="Room Code (optional)" />
+
+    <div id="avatarPreview"></div>
+    <div id="emojiChoices"></div>
+    <div id="hatChoices"></div>
+    <div id="colorChoices"></div>
+
+    <div class="buttonRow">
+      <button id="createRoomBtn" class="primaryBtn">Create Room</button>
+      <button id="joinRoomBtn" class="secondaryBtn">Join Room</button>
+    </div>
+
+    <div id="message" class="message"></div>
   </div>
+</div>
 
-  <div id="app">
-    <div id="menuScreen" class="screen">
-      <div class="panel glamPanel">
-        <div class="titleWrap">
-          <h1 class="gameTitle">PLAY-DAY</h1>
-          <p class="tagline">Money. Chaos. Family. Friends.</p>
-        </div>
+<div id="lobbyScreen" class="screen hidden">
+  <div class="panel lobbyPanel">
+    <h2>Room: <span id="roomCodeDisplay"></span></h2>
 
-        <p class="subtext">
-          Create a room or join a room to start building your game night.
-        </p>
+    <ul id="playerList"></ul>
 
-        <div class="inputStack">
-          <input id="nameInput" type="text" maxlength="16" placeholder="Enter your name">
-          <input id="roomCodeInput" type="text" maxlength="4" placeholder="Room code">
-        </div>
+    <button id="startGameBtn" class="primaryBtn hidden">Start Game</button>
+    <button id="leaveLobbyBtn" class="secondaryBtn">Leave</button>
 
-        <div class="avatarSetupCard">
-          <div class="avatarSetupTop">
-            <div>
-              <h3 class="avatarTitle">Character Builder</h3>
-              <p class="avatarSub">Pick your little board gremlin.</p>
-            </div>
-            <div id="avatarPreview" class="avatarPreview"></div>
+    <div id="lobbyChatList" class="chatList"></div>
+    <div class="chatInputRow">
+      <input id="lobbyChatInput" placeholder="Chat..." />
+      <button id="sendLobbyChatBtn">Send</button>
+    </div>
+
+    <div id="lobbyMessage"></div>
+  </div>
+</div>
+
+<div id="gameScreen" class="screen hidden">
+
+  <div class="gameShell">
+
+    <!-- LEFT -->
+    <div class="sidePanel">
+      <div>Room: <span id="gameRoomCodeShort"></span></div>
+      <div>Bank: <span id="bankAmount"></span></div>
+      <div>Turn: <span id="currentTurnText"></span></div>
+      <div id="turnInfoText"></div>
+
+      <button id="rollTurnBtn" class="primaryBtn">Roll Turn</button>
+      <button id="musicToggleBtn">Music: OFF</button>
+
+      <div id="gamePlayersList"></div>
+    </div>
+
+    <!-- BOARD -->
+    <div class="boardArea">
+      <div id="boardWrap">
+        <div id="gameBoard">
+          <div class="boardGrid" id="boardGrid">
+            <!-- tiles should already exist in your original html -->
           </div>
-
-          <div class="pickerGroup">
-            <div class="pickerLabel">Emoji</div>
-            <div id="emojiChoices" class="pickerRow"></div>
-          </div>
-
-          <div class="pickerGroup">
-            <div class="pickerLabel">Hat</div>
-            <div id="hatChoices" class="pickerRow"></div>
-          </div>
-
-          <div class="pickerGroup">
-            <div class="pickerLabel">Color</div>
-            <div id="colorChoices" class="colorRow"></div>
-          </div>
         </div>
-
-        <div class="buttonRow">
-          <button id="createRoomBtn" class="primaryBtn">Create Room</button>
-          <button id="joinRoomBtn" class="secondaryBtn">Join Room</button>
-        </div>
-
-        <p id="message" class="message"></p>
       </div>
     </div>
 
-    <div id="lobbyScreen" class="screen hidden">
-      <div class="panel lobbyPanel">
-        <div class="topBar">
-          <div>
-            <h1>Lobby</h1>
-            <p class="roomCodeText">Room Code: <span id="roomCodeDisplay">----</span></p>
-          </div>
-          <div class="pill">Up to 12 Players</div>
-        </div>
-
-        <p class="subtext">Share the room code with friends and wait for everyone to join.</p>
-
-        <div class="lobbyGrid">
-          <div class="cardSection">
-            <h2>Players</h2>
-            <ul id="playerList"></ul>
-          </div>
-
-          <div class="cardSection">
-            <h2>Lobby Chat</h2>
-            <div id="lobbyChatList" class="chatList"></div>
-
-            <div class="chatInputRow">
-              <input id="lobbyChatInput" type="text" maxlength="180" placeholder="Say something...">
-              <button id="sendLobbyChatBtn" class="chatSendBtn">Send</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="buttonRow">
-          <button id="startGameBtn" class="primaryBtn hidden">Start Game</button>
-          <button id="leaveLobbyBtn" class="secondaryBtn">Refresh / Leave</button>
-        </div>
-
-        <p id="lobbyMessage" class="message"></p>
+    <!-- RIGHT -->
+    <div class="sidePanel">
+      <div id="gameChatList" class="chatList"></div>
+      <div class="chatInputRow">
+        <input id="gameChatInput" placeholder="Chat..." />
+        <button id="sendGameChatBtn">Send</button>
       </div>
     </div>
 
-    <div id="rollScreen" class="screen hidden">
-      <div class="panel rollPanel">
-        <div class="topBar">
-          <div>
-            <h1>Roll for Turn Order</h1>
-            <p class="roomCodeText">Room Code: <span id="rollRoomCodeDisplay">----</span></p>
-          </div>
-          <div class="pill goldPill">Highest Roll Goes First</div>
-        </div>
+  </div>
+</div>
 
-        <p class="subtext">Everyone rolls once. The dice will animate on screen for fun.</p>
+<!-- Dice Overlay -->
+<div id="sharedDiceOverlay" class="hidden">
+  <div>
+    <h2 id="sharedDiceTitle"></h2>
+    <div id="sharedDiceCube" class="dice"></div>
+    <div id="sharedDiceValue"></div>
+  </div>
+</div>
 
-        <div class="rollMain">
-          <div class="diceStage">
-            <div id="dice" class="dice">
-              <div class="face face1"><span class="pip center"></span></div>
-              <div class="face face2"><span class="pip topLeft"></span><span class="pip bottomRight"></span></div>
-              <div class="face face3"><span class="pip topLeft"></span><span class="pip center"></span><span class="pip bottomRight"></span></div>
-              <div class="face face4"><span class="pip topLeft"></span><span class="pip topRight"></span><span class="pip bottomLeft"></span><span class="pip bottomRight"></span></div>
-              <div class="face face5"><span class="pip topLeft"></span><span class="pip topRight"></span><span class="pip center"></span><span class="pip bottomLeft"></span><span class="pip bottomRight"></span></div>
-              <div class="face face6"><span class="pip topLeft"></span><span class="pip topRight"></span><span class="pip midLeft"></span><span class="pip midRight"></span><span class="pip bottomLeft"></span><span class="pip bottomRight"></span></div>
-            </div>
+<!-- Event Popup -->
+<div id="eventPopup" class="hidden">
+  <h3 id="eventTitle"></h3>
+  <p id="eventMessage"></p>
+</div>
 
-            <div id="diceValueText" class="diceValueText">Waiting to roll...</div>
+<!-- Card Reveal -->
+<div id="revealOverlay" class="hidden">
+  <div id="revealPlayer"></div>
+  <div id="revealCount"></div>
 
-            <div class="buttonRow narrowRow">
-              <button id="rollBtn" class="primaryBtn">Roll Dice</button>
-            </div>
-          </div>
-
-          <div class="rollInfo">
-            <div class="cardSection">
-              <h2>Roll Results</h2>
-              <div id="rollResults" class="resultsBox"></div>
-            </div>
-
-            <div class="cardSection">
-              <h2>Turn Order</h2>
-              <div id="turnOrderResults" class="resultsBox"></div>
-            </div>
-          </div>
-        </div>
-
-        <p id="rollMessage" class="message"></p>
+  <div id="revealCard" class="flipCard">
+    <div class="flipCardInner">
+      <div class="flipCardFace flipCardBack">
+        <div class="cardBackTitle">CARD</div>
       </div>
-    </div>
-
-    <div id="gameScreen" class="screen hidden">
-      <div class="gameShell">
-        <aside class="sidePanel leftPanel">
-          <div class="sideCard deckCard dealDeck mobileDeckOrder">
-            <div class="deckHeader">DEALS</div>
-            <div class="deckBody">
-              <div class="stackVisual"><span></span><span></span><span></span></div>
-              <p>Risk it for the biscuit. These can be great or terrible.</p>
-            </div>
-          </div>
-
-          <div class="sideCard deckCard mailDeck mobileDeckOrder">
-            <div class="deckHeader">MAIL</div>
-            <div class="deckBody">
-              <div class="stackVisual"><span></span><span></span><span></span></div>
-              <p>The mail can bless you or absolutely ruin your day.</p>
-            </div>
-          </div>
-
-          <div class="sideCard mobilePlayersOrder">
-            <div class="deckHeader">PLAYERS</div>
-            <div id="gamePlayersList" class="moneyBoard"></div>
-          </div>
-        </aside>
-
-        <main class="boardArea">
-          <div class="gameHud">
-            <div class="hudPill">Room: <span id="gameRoomCodeShort">----</span></div>
-            <div class="hudPill">Bank: <span id="bankAmount">$0</span></div>
-            <div class="hudPill">Turn: <span id="currentTurnText">Waiting...</span></div>
-            <button id="musicToggleBtn" class="hudMusicBtn" type="button">Music: OFF</button>
-          </div>
-
-          <div class="actionBar mobileStickyBar">
-            <button id="rollTurnBtn" class="primaryBtn">Roll Turn</button>
-          </div>
-
-          <div id="eventPopup" class="eventPopup hidden">
-            <h3 id="eventTitle">Tile Event</h3>
-            <p id="eventMessage">Something happened.</p>
-          </div>
-
-          <div id="boardOuterScroll">
-            <div id="boardWrap">
-              <div id="gameBoard">
-                <div class="boardTitle">PLAY-DAY</div>
-                <div class="calendarHint">Follow the path like a real board game.</div>
-
-                <div class="boardGrid">
-                  <div class="tile startTile" data-pos="0">
-                    <span class="tileNum">0</span>
-                    <span class="tileLabel">START</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="1">
-                    <span class="tileNum">1</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="2">
-                    <span class="tileNum">2</span>
-                    <span class="tileLabel">2 MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile dealTile" data-pos="3">
-                    <span class="tileNum">3</span>
-                    <span class="tileLabel">DEAL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="4">
-                    <span class="tileNum">4</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="5">
-                    <span class="tileNum">5</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="6">
-                    <span class="tileNum">6</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="7">
-                    <span class="tileNum">7</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-
-                  <div class="tile dealTile" data-pos="15">
-                    <span class="tileNum">15</span>
-                    <span class="tileLabel">DEAL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="14">
-                    <span class="tileNum">14</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="13">
-                    <span class="tileNum">13</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="12">
-                    <span class="tileNum">12</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile lotteryTile" data-pos="11">
-                    <span class="tileNum">11</span>
-                    <span class="tileLabel">LOTTERY</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="10">
-                    <span class="tileNum">10</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile dealTile" data-pos="9">
-                    <span class="tileNum">9</span>
-                    <span class="tileLabel">DEAL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="8">
-                    <span class="tileNum">8</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-
-                  <div class="tile mailTile" data-pos="16">
-                    <span class="tileNum">16</span>
-                    <span class="tileLabel">3 MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile radioTile" data-pos="17">
-                    <span class="tileNum">17</span>
-                    <span class="tileLabel">RADIO</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="18">
-                    <span class="tileNum">18</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile dealTile" data-pos="19">
-                    <span class="tileNum">19</span>
-                    <span class="tileLabel">DEAL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="20">
-                    <span class="tileNum">20</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="21">
-                    <span class="tileNum">21</span>
-                    <span class="tileLabel">2 MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="22">
-                    <span class="tileNum">22</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="23">
-                    <span class="tileNum">23</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-
-                  <div class="tile paydayTile" data-pos="31">
-                    <span class="tileNum">31</span>
-                    <span class="tileLabel">PAYDAY</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="30">
-                    <span class="tileNum">30</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="29">
-                    <span class="tileNum">29</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="28">
-                    <span class="tileNum">28</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile lotteryTile" data-pos="27">
-                    <span class="tileNum">27</span>
-                    <span class="tileLabel">LOTTERY</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="26">
-                    <span class="tileNum">26</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile mailTile" data-pos="25">
-                    <span class="tileNum">25</span>
-                    <span class="tileLabel">MAIL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                  <div class="tile dealTile" data-pos="24">
-                    <span class="tileNum">24</span>
-                    <span class="tileLabel">DEAL</span>
-                    <div class="tilePieces"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
-
-        <aside class="sidePanel rightPanel">
-          <div class="sideCard mobileTurnOrder">
-            <div class="deckHeader">TURN INFO</div>
-            <div class="sideInfo">
-              <p id="turnInfoText">Waiting for the game to begin.</p>
-            </div>
-          </div>
-
-          <div class="sideCard mobileChatOrder">
-            <div class="deckHeader">GAME CHAT</div>
-            <div id="gameChatList" class="chatList gameChat"></div>
-
-            <div class="chatInputRow">
-              <input id="gameChatInput" type="text" maxlength="180" placeholder="Type in chat...">
-              <button id="sendGameChatBtn" class="chatSendBtn">Send</button>
-            </div>
-          </div>
-        </aside>
+      <div class="flipCardFace flipCardFront">
+        <div id="revealFrontTitle"></div>
+        <div id="revealFrontText"></div>
+        <div id="revealAmount"></div>
       </div>
     </div>
   </div>
+</div>
 
-  <div id="revealOverlay" class="revealOverlay hidden">
-    <div class="revealHud">
-      <div id="revealPlayer" class="revealPlayer">Player drew a card</div>
-      <div id="revealCount" class="revealCount"></div>
-    </div>
+<!-- PLAYDAY -->
+<div id="playdayOverlay" class="hidden">
+  <h1 id="playdayTitle"></h1>
+  <p id="playdayText"></p>
+  <div id="playdayRain"></div>
+</div>
 
-    <div id="revealCard" class="flipCard revealDefault">
-      <div class="flipCardInner">
-        <div class="flipCardFace flipCardBack">
-          <div class="cardBackTitle">PLAY-DAY</div>
-          <div class="cardBackSub">DRAWING CARD...</div>
-        </div>
+<audio id="bgMusic" src="money.mp3" loop></audio>
 
-        <div class="flipCardFace flipCardFront">
-          <div id="revealFrontTitle" class="cardFrontTitle">MAIL</div>
-          <div id="revealFrontText" class="cardFrontText">Something happened.</div>
-          <div id="revealAmount" class="cardAmount">+$100</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="sharedDiceOverlay" class="sharedDiceOverlay hidden">
-    <div class="sharedDicePanel">
-      <div id="sharedDiceTitle" class="sharedDiceTitle">Rolling...</div>
-
-      <div id="sharedDiceCube" class="dice sharedDiceCube">
-        <div class="face face1"><span class="pip center"></span></div>
-        <div class="face face2"><span class="pip topLeft"></span><span class="pip bottomRight"></span></div>
-        <div class="face face3"><span class="pip topLeft"></span><span class="pip center"></span><span class="pip bottomRight"></span></div>
-        <div class="face face4"><span class="pip topLeft"></span><span class="pip topRight"></span><span class="pip bottomLeft"></span><span class="pip bottomRight"></span></div>
-        <div class="face face5"><span class="pip topLeft"></span><span class="pip topRight"></span><span class="pip center"></span><span class="pip bottomLeft"></span><span class="pip bottomRight"></span></div>
-        <div class="face face6"><span class="pip topLeft"></span><span class="pip topRight"></span><span class="pip midLeft"></span><span class="pip midRight"></span><span class="pip bottomLeft"></span><span class="pip bottomRight"></span></div>
-      </div>
-
-      <div id="sharedDiceValue" class="sharedDiceValue">Rolling...</div>
-    </div>
-  </div>
-
-  <div id="playdayOverlay" class="playdayOverlay hidden">
-    <div id="playdayRain" class="playdayRain"></div>
-    <div class="playdayContent">
-      <h1 id="playdayTitle" class="playdayTitle">PLAYDAYYYY</h1>
-      <div id="playdayText" class="playdaySub">Collected $3,500!</div>
-    </div>
-  </div>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="client.js"></script>
 </body>
 </html>
