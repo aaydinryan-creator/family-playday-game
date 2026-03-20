@@ -73,6 +73,26 @@ function transferHostIfNeeded(room, oldHostId) {
   }
 }
 
+function getSafePlayer(player) {
+  return {
+    id: player.id,
+    name: player.name,
+    position: player.position,
+    cash: player.cash,
+    avatar: player.avatar,
+    connected: player.connected !== false,
+    deals: Array.isArray(player.deals) ? player.deals : [],
+    hand: Array.isArray(player.hand) ? player.hand : [],
+    inventory: {
+      items: Array.isArray(player.inventory?.items) ? player.inventory.items : []
+    },
+    stats: {
+      totalEarned: Number(player.stats?.totalEarned || 0),
+      totalLost: Number(player.stats?.totalLost || 0)
+    }
+  };
+}
+
 function getSafeRoom(room) {
   return {
     code: room.code,
@@ -81,16 +101,8 @@ function getSafeRoom(room) {
     bank: room.bank,
     turnIndex: room.turnIndex,
     currentPlayerId: getCurrentPlayer(room)?.id || null,
-    players: room.players.map((player) => ({
-      id: player.id,
-      name: player.name,
-      position: player.position,
-      cash: player.cash,
-      avatar: player.avatar,
-      connected: player.connected !== false,
-      deals: Array.isArray(player.deals) ? player.deals : []
-    })),
-    chat: Array.isArray(room.chat) ? room.chat.slice(-40) : []
+    players: room.players.map(getSafePlayer),
+    chat: Array.isArray(room.chat) ? room.chat.slice(-50) : []
   };
 }
 
