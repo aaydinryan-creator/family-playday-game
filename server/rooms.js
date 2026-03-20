@@ -15,18 +15,23 @@ function generateRoomCode(existingRooms = {}) {
 }
 
 function getRoomBySocketId(rooms, socketId) {
-  return Object.values(rooms).find((room) =>
-    room.players.some((player) => player.id === socketId)
+  if (!rooms || !socketId) return null;
+
+  return (
+    Object.values(rooms).find((room) =>
+      Array.isArray(room.players) &&
+      room.players.some((player) => player.id === socketId)
+    ) || null
   );
 }
 
 function getPlayerBySocketId(room, socketId) {
-  if (!room) return null;
+  if (!room || !Array.isArray(room.players)) return null;
   return room.players.find((player) => player.id === socketId) || null;
 }
 
 function removePlayerFromRoom(room, socketId) {
-  if (!room) {
+  if (!room || !Array.isArray(room.players)) {
     return {
       removedPlayer: null,
       removedIndex: -1
@@ -34,6 +39,7 @@ function removePlayerFromRoom(room, socketId) {
   }
 
   const removedIndex = room.players.findIndex((player) => player.id === socketId);
+
   if (removedIndex === -1) {
     return {
       removedPlayer: null,
@@ -51,8 +57,10 @@ function removePlayerFromRoom(room, socketId) {
 }
 
 function ensureValidTurnIndex(room) {
-  if (!room || !room.players.length) {
-    if (room) room.turnIndex = 0;
+  if (!room) return;
+
+  if (!Array.isArray(room.players) || room.players.length === 0) {
+    room.turnIndex = 0;
     return;
   }
 
@@ -66,7 +74,7 @@ function ensureValidTurnIndex(room) {
 }
 
 function transferHostIfNeeded(room, oldHostId) {
-  if (!room || !room.players.length) return;
+  if (!room || !Array.isArray(room.players) || !room.players.length) return;
 
   if (room.hostId === oldHostId) {
     room.hostId = room.players[0].id;
@@ -74,44 +82,55 @@ function transferHostIfNeeded(room, oldHostId) {
 }
 
 function getSafePlayer(player) {
+  const inventoryItems = Array.isArray(player?.inventory?.items)
+    ? player.inventory.items
+    : [];
+
   return {
-    id: player.id,
-    name: player.name,
-    position: player.position,
-    cash: player.cash,
-    avatar: player.avatar,
-    connected: player.connected !== false,
-    deals: Array.isArray(player.deals) ? player.deals : [],
-    hand: Array.isArray(player.hand) ? player.hand : [],
+    id: player?.id || null,
+    name: player?.name || "Player",
+    position: Number(player?.position || 0),
+    cash: Number(player?.cash || 0),
+    avatar: player?.avatar || null,
+    connected: player?.connected !== false,
+    deals: Array.isArray(player?.deals) ? player.deals : [],
+    hand: Array.isArray(player?.hand) ? player.hand : [],
     inventory: {
-      items: Array.isArray(player.inventory?.items) ? player.inventory.items : []
+      items: inventoryItems
     },
     stats: {
-      totalEarned: Number(player.stats?.totalEarned || 0),
-      totalLost: Number(player.stats?.totalLost || 0)
+      totalEarned: Number(player?.stats?.totalEarned || 0),
+      totalLost: Number(player?.stats?.totalLost || 0)
     }
   };
 }
 
 function getSafeRoom(room) {
+  const safePlayers = Array.isArray(room?.players)
+    ? room.players.map(getSafePlayer)
+    : [];
+
   return {
-    code: room.code,
-    hostId: room.hostId,
-    phase: room.phase,
-    bank: room.bank,
-    turnIndex: room.turnIndex,
+    code: room?.code || "",
+    hostId: room?.hostId || null,
+    phase: room?.phase || "lobby",
+    bank: Number(room?.bank || 0),
+    turnIndex: Number(room?.turnIndex || 0),
     currentPlayerId: getCurrentPlayer(room)?.id || null,
-    players: room.players.map(getSafePlayer),
-    chat: Array.isArray(room.chat) ? room.chat.slice(-50) : []
+    players: safePlayers,
+    chat: Array.isArray(room?.chat) ? room.chat.slice(-50) : []
   };
 }
 
 function emitRoomUpdate(io, room) {
+  if (!io || !room?.code) return;
   io.to(room.code).emit("roomUpdated", getSafeRoom(room));
 }
 
 function pushSystemMessage(room, text) {
-  if (!room.chat) room.chat = [];
+  if (!room) return;
+  if (!Array.isArray(room.chat)) room.chat = [];
+
   room.chat.push({
     system: true,
     text: String(text || "")

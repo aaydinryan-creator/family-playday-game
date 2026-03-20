@@ -25,11 +25,14 @@ function createRoom(code, hostId) {
 function createPlayer(id, name, avatar) {
   return {
     id,
+    reconnectId: null,
     name,
     position: 0,
     cash: 3500,
     avatar,
     connected: true,
+    disconnectTimer: null,
+    lastSeenAt: Date.now(),
     deals: [],
     hand: [],
     inventory: {
@@ -43,11 +46,15 @@ function createPlayer(id, name, avatar) {
 }
 
 function getCurrentPlayer(room) {
+  if (!room || !Array.isArray(room.players) || !room.players.length) {
+    return null;
+  }
+
   return room.players[room.turnIndex] || null;
 }
 
 function nextTurn(room) {
-  if (!room.players.length) return;
+  if (!room || !Array.isArray(room.players) || !room.players.length) return;
   room.turnIndex = (room.turnIndex + 1) % room.players.length;
 }
 

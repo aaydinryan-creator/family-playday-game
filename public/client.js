@@ -7,6 +7,7 @@ let eventTimeout = null;
 let sharedRollingInterval = null;
 let sharedTurnRollAnimating = false;
 let globalAlertTimeout = null;
+let allowPageExit = false;
 
 const CARD_READ_TIME = 9000;
 const GLOBAL_ALERT_TIME = 2400;
@@ -99,6 +100,57 @@ const avatarPreview = document.getElementById("avatarPreview");
 
 const bgMusic = document.getElementById("bgMusic");
 const musicToggleBtn = document.getElementById("musicToggleBtn");
+
+function getReconnectId() {
+  let reconnectId = localStorage.getItem("playday_reconnect_id");
+  if (!reconnectId) {
+    reconnectId = `playday_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+    localStorage.setItem("playday_reconnect_id", reconnectId);
+  }
+  return reconnectId;
+}
+
+const reconnectId = getReconnectId();
+
+function isTypingInField(target) {
+  if (!target) return false;
+  const tag = String(target.tagName || "").toLowerCase();
+  return tag === "input" || tag === "textarea" || target.isContentEditable;
+}
+
+function isInActiveRoom() {
+  return !!(currentRoom && currentRoom.code && currentRoom.phase);
+}
+
+function enableIntentionalPageExit() {
+  allowPageExit = true;
+  setTimeout(() => {
+    allowPageExit = false;
+  }, 2500);
+}
+
+window.addEventListener("beforeunload", (e) => {
+  if (allowPageExit) return;
+  if (!isInActiveRoom()) return;
+
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+document.addEventListener("keydown", (e) => {
+  if (allowPageExit) return;
+  if (!isInActiveRoom()) return;
+
+  const key = String(e.key || "").toLowerCase();
+  const refreshing =
+    key === "f5" ||
+    ((e.ctrlKey || e.metaKey) && key === "r");
+
+  if (refreshing && !isTypingInField(e.target)) {
+    e.preventDefault();
+    showEvent("Hold up", "Refreshing now could kick you out of the game.", "default", 2200);
+  }
+});
 
 function ensureAudioContext() {
   if (!audioContext) {
@@ -973,7 +1025,8 @@ createRoomBtn?.addEventListener("click", () => {
 
   socket.emit("createRoom", {
     name: nameInput?.value || "",
-    avatar: getSelectedAvatar()
+    avatar: getSelectedAvatar(),
+    reconnectId
   });
 });
 
@@ -984,7 +1037,8 @@ joinRoomBtn?.addEventListener("click", () => {
   socket.emit("joinRoom", {
     name: nameInput?.value || "",
     roomCode: roomCodeInput?.value || "",
-    avatar: getSelectedAvatar()
+    avatar: getSelectedAvatar(),
+    reconnectId
   });
 });
 
@@ -995,6 +1049,7 @@ startGameBtn?.addEventListener("click", () => {
 });
 
 leaveLobbyBtn?.addEventListener("click", () => {
+  enableIntentionalPageExit();
   window.location.reload();
 });
 
