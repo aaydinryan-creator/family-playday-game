@@ -54,6 +54,17 @@ function removeMoney(player, room, amount) {
   room.bank += value;
 }
 
+function transferMoney(fromPlayer, toPlayer, amount) {
+  const value = Number(amount || 0);
+  fromPlayer.cash -= value;
+  toPlayer.cash += value;
+}
+
+function getOtherPlayers(room, player) {
+  if (!room || !Array.isArray(room.players)) return [];
+  return room.players.filter((p) => p.id !== player.id);
+}
+
 function randomFrom(list) {
   return list[Math.floor(Math.random() * list.length)];
 }
@@ -177,7 +188,65 @@ const MAIL_CARDS = [
   { text: "You were chosen for nothing. The envelope was empty. Emotional damage only.", amount: 0 },
   { text: "You got a refund from returning something crusty. Collect $80.", amount: 80 },
   { text: "You opened mail while already in a bad mood. Huge mistake. Pay $205.", amount: -205 },
-  { text: "A family member sent birthday money late, but still. Collect $90.", amount: 90 }
+  { text: "A family member sent birthday money late, but still. Collect $90.", amount: 90 },
+
+  { text: "This letter exists just to tell you nobody is impressed. Do better.", amount: 0 },
+  { text: "Well well well... look who's still broke. No money. Just vibes.", amount: 0 },
+  { text: "You opened this expecting money. That's actually hilarious.", amount: 0 },
+  { text: "Hey just checking in to say you're not doing great.", amount: 0 },
+  { text: "This envelope had potential. Just like you. Both empty.", amount: 0 },
+  { text: "You thought this was going to help you? Nah.", amount: 0 },
+  { text: "No money. Just disappointment delivered directly to your hands.", amount: 0 },
+  { text: "This is a certified waste-of-your-time letter.", amount: 0 },
+  { text: "The mailman laughed when he handed you this.", amount: 0 },
+  { text: "You got mail! Unfortunately, it's useless.", amount: 0 },
+  { text: "This letter just says: 'you fat fuck.' No money included.", amount: 0 },
+  { text: "We regret to inform you that you're still you.", amount: 0 },
+  { text: "No money. No help. Just disrespect.", amount: 0 },
+  { text: "This letter is here to remind you you're behind in life.", amount: 0 },
+  { text: "You opened this for nothing. Let that sink in.", amount: 0 },
+  { text: "No reward. Just emotional damage.", amount: 0 },
+  { text: "This could've been money. It is not.", amount: 0 },
+  { text: "A message from life: 'figure it out.'", amount: 0 },
+  { text: "Even this letter expected more from you.", amount: 0 },
+  { text: "You really stopped your turn for THIS?", amount: 0 },
+  { text: "The letter just says 'lol'. That's it.", amount: 0 },
+  { text: "You got mail and somehow still lost.", amount: 0 },
+  { text: "This envelope contains absolutely nothing of value. Including hope.", amount: 0 },
+  { text: "You expected a blessing. You got roasted instead.", amount: 0 },
+  { text: "This was personal.", amount: 0 },
+  { text: "Somebody spent a stamp just to hate on you. Respect.", amount: 0 },
+  { text: "You opened the envelope and somehow it smelled like bad decisions.", amount: 0 },
+  { text: "This card just says 'stay humble' and honestly that's fair.", amount: 0 },
+  { text: "The letter inside says you peaked too early.", amount: 0 },
+  { text: "This envelope had more confidence in itself than you do.", amount: 0 },
+
+  { text: "You tried to impress somebody and ended up embarrassing yourself AND your wallet. Pay $220.", amount: -220 },
+  { text: "You checked your account and just stared at it for a while. Pay $140.", amount: -140 },
+  { text: "Your life isn't falling apart, it already fell. This is just the bounce. Pay $310.", amount: -310 },
+  { text: "You ordered something online and it showed up looking nothing like the picture. Pay $180.", amount: -180 },
+  { text: "You tried to act rich for one night and now you're broke for a week. Pay $260.", amount: -260 },
+  { text: "Someone looked at your purchase and said '...why?' You had no answer. Pay $90.", amount: -90 },
+  { text: "You opened your banking app and immediately closed it. Nothing changed. Pay $200.", amount: -200 },
+  { text: "You got charged for something you don't even remember agreeing to. Pay $150.", amount: -150 },
+  { text: "You tried to save money and somehow spent more. Incredible. Pay $175.", amount: -175 },
+  { text: "You made a terrible decision and now it's a monthly payment. Pay $120.", amount: -120 },
+  { text: "Against all odds, your dumb decision actually worked. Collect $400.", amount: 400 },
+  { text: "You did something questionable but profitable. Respect. Collect $350.", amount: 350 },
+  { text: "You got lucky for no reason. Don't question it. Collect $280.", amount: 280 },
+  { text: "Someone overpaid you and you didn't correct them. Collect $300.", amount: 300 },
+  { text: "You found money in a place you definitely checked before. Collect $150.", amount: 150 },
+  { text: "You opened a letter that roasted you and then asked for money. Disrespectful. Pay $210.", amount: -210 },
+  { text: "You got mail and immediately knew it was going to ruin your mood. It did. Pay $160.", amount: -160 },
+
+  { text: "You started drama in the group chat and somehow got paid for it. Everyone pays you $80.", action: "collect_from_all", amountPerPlayer: 80 },
+  { text: "You got exposed for acting rich. Pay every other player $60.", action: "pay_all", amountPerPlayer: 60 },
+  { text: "You mailed your sob story to the wrong people and one random player had to bail you out. Steal $150 from them.", action: "steal_random_player", amount: 150 },
+  { text: "You got guilt-tripped so hard you handed a random player $140.", action: "pay_random_player", amount: 140 },
+  { text: "You opened a letter that legally transferred your bad luck to somebody else. Swap cash with a random player.", action: "swap_cash_with_random" },
+  { text: "Your family took a vote and decided you are the broke one. Everyone gives you $50 out of pity.", action: "collect_from_all", amountPerPlayer: 50 },
+  { text: "You got caught lying about being 'good for it.' Pay every other player $75.", action: "pay_all", amountPerPlayer: 75 },
+  { text: "A random player accidentally mailed you money meant for their own bills. Take $120 from them.", action: "steal_random_player", amount: 120 }
 ];
 
 const DEAL_CARDS = [
@@ -230,7 +299,47 @@ const DEAL_CARDS = [
   { text: "You sold leftover junk in one bundle. Collect $155.", amount: 155 },
   { text: "You got baited by a too-good-to-be-true deal. Lose $365.", amount: -365 },
   { text: "You turned a side hustle into actual money for once. Collect $505.", amount: 505 },
-  { text: "You bought damaged goods thinking you were slick. Lose $225.", amount: -225 }
+  { text: "You bought damaged goods thinking you were slick. Lose $225.", amount: -225 },
+
+  { text: "You trusted your instincts. That was your first mistake. Lose $600.", amount: -600 },
+  { text: "You thought you were being smart. You were not. Lose $450.", amount: -450 },
+  { text: "You got absolutely finessed and had to pretend you were okay with it. Lose $700.", amount: -700 },
+  { text: "You made a move so bad it should be studied. Lose $520.", amount: -520 },
+  { text: "You tried to flip something and ended up flipping your financial stability instead. Lose $480.", amount: -480 },
+  { text: "You invested in vibes instead of logic. Lose $650.", amount: -650 },
+  { text: "You saw 'limited time offer' and lost all critical thinking. Lose $390.", amount: -390 },
+  { text: "You made money doing something you probably shouldn't have. Collect $800.", amount: 800 },
+  { text: "You pulled off a deal so clean it felt illegal. Collect $950.", amount: 950 },
+  { text: "You got away with something and profited. Wild. Collect $700.", amount: 700 },
+  { text: "Your dumb idea printed money. Nobody understands why. Collect $880.", amount: 880 },
+  { text: "You finessed the system and it actually worked. Collect $920.", amount: 920 },
+  { text: "You hesitated for 2 seconds and missed a huge opportunity. Sit with that. Lose $300.", amount: -300 },
+  { text: "You jumped into something with confidence and no plan. It shows. Lose $410.", amount: -410 },
+  { text: "You got involved in something you had no business being in. Lose $560.", amount: -560 },
+  { text: "You thought 'how bad could it be?' Now you know. Lose $470.", amount: -470 },
+  { text: "Your side hustle lasted 14 minutes before becoming a financial hate crime. Lose $740.", amount: -740 },
+  { text: "You bought a 'great deal' off Facebook and received a box of broken lies. Lose $430.", amount: -430 },
+  { text: "You got caught acting rich with broke pockets. Pay $300 immediately.", amount: -300 },
+  { text: "A scammer saw you coming from a mile away and rang the register. Lose $650.", amount: -650 },
+  { text: "You sold complete nonsense with full confidence and it worked. Collect $610.", amount: 610 },
+  { text: "You made rent money from pure stupidity. Respectfully, collect $540.", amount: 540 },
+  { text: "You got lucky and now you're going to act like it was skill. Collect $450.", amount: 450 },
+  { text: "You launched a terrible idea and somehow idiots supported it. Collect $730.", amount: 730 },
+  { text: "You bought into a fake hustle and got folded like laundry. Lose $580.", amount: -580 },
+  { text: "You tried to move like a boss and ended up paying idiot tax. Lose $360.", amount: -360 },
+  { text: "You blew money chasing hype and got left holding garbage. Lose $490.", amount: -490 },
+  { text: "You found one desperate buyer with terrible judgment. Collect $390.", amount: 390 },
+
+  { text: "You scammed the vibe right out of the room. A random player pays you $180.", action: "steal_random_player", amount: 180 },
+  { text: "You talked big, failed publicly, and now you owe a random player $160.", action: "pay_random_player", amount: 160 },
+  { text: "You started a fake empire and somehow everybody funded it. Every player pays you $100.", action: "collect_from_all", amountPerPlayer: 100 },
+  { text: "Your genius plan collapsed on impact. Pay every other player $90 for wasting their oxygen.", action: "pay_all", amountPerPlayer: 90 },
+  { text: "You bullied your way into a deal and stole lunch money from a random player. Take $140.", action: "steal_random_player", amount: 140 },
+  { text: "You folded under pressure and handed a random player $200. Sad.", action: "pay_random_player", amount: 200 },
+  { text: "You somehow convinced the room you were onto something. Everyone gives you $70.", action: "collect_from_all", amountPerPlayer: 70 },
+  { text: "You ran your mouth, got humbled, and now must pay everyone $85.", action: "pay_all", amountPerPlayer: 85 },
+  { text: "Your chaos reached legendary levels. Swap cash with a random player.", action: "swap_cash_with_random" },
+  { text: "You robbed the wrong clown but still came out ahead. Steal $220 from a random player.", action: "steal_random_player", amount: 220 }
 ];
 
 const ALAYNA_FORCED_DOUBLE_MAIL = [
@@ -362,21 +471,189 @@ function drawFromRoomDeck(room, deckType) {
   return card;
 }
 
+function resolveCardEffect(card, player, room) {
+  const action = card.action || null;
+  const others = getOtherPlayers(room, player);
+
+  if (!action) {
+    return {
+      text: card.text,
+      amount: Number(card.amount || 0)
+    };
+  }
+
+  switch (action) {
+    case "collect_from_all": {
+      const perPlayer = Number(card.amountPerPlayer || 0);
+
+      if (!others.length) {
+        return {
+          text: `${card.text} But there was nobody else to rob.`,
+          amount: 0
+        };
+      }
+
+      let total = 0;
+      others.forEach((other) => {
+        transferMoney(other, player, perPlayer);
+        total += perPlayer;
+      });
+
+      return {
+        text: `${card.text} Total collected: ${formatMoney(total)}.`,
+        amount: total
+      };
+    }
+
+    case "pay_all": {
+      const perPlayer = Number(card.amountPerPlayer || 0);
+
+      if (!others.length) {
+        return {
+          text: `${card.text} Lucky for you, nobody else was there.`,
+          amount: 0
+        };
+      }
+
+      let total = 0;
+      others.forEach((other) => {
+        transferMoney(player, other, perPlayer);
+        total += perPlayer;
+      });
+
+      return {
+        text: `${card.text} Total lost: ${formatMoney(total)}.`,
+        amount: -total
+      };
+    }
+
+    case "steal_random_player": {
+      if (!others.length) {
+        return {
+          text: `${card.text} But there was nobody else around to victimise.`,
+          amount: 0
+        };
+      }
+
+      const target = randomFrom(others);
+      const stealAmount = Number(card.amount || 0);
+      transferMoney(target, player, stealAmount);
+
+      return {
+        text: `${card.text} You ripped ${formatMoney(stealAmount)} from ${target.name}.`,
+        amount: stealAmount
+      };
+    }
+
+    case "pay_random_player": {
+      if (!others.length) {
+        return {
+          text: `${card.text} But there was nobody else there to benefit from your stupidity.`,
+          amount: 0
+        };
+      }
+
+      const target = randomFrom(others);
+      const payAmount = Number(card.amount || 0);
+      transferMoney(player, target, payAmount);
+
+      return {
+        text: `${card.text} ${target.name} received ${formatMoney(payAmount)} from your disaster.`,
+        amount: -payAmount
+      };
+    }
+
+    case "swap_cash_with_random": {
+      if (!others.length) {
+        return {
+          text: `${card.text} But there was nobody else there, so you just stayed broke in peace.`,
+          amount: 0
+        };
+      }
+
+      const target = randomFrom(others);
+      const playerBefore = player.cash;
+      const targetBefore = target.cash;
+
+      player.cash = targetBefore;
+      target.cash = playerBefore;
+
+      const net = targetBefore - playerBefore;
+
+      let resultText = `${card.text} You swapped cash with ${target.name}.`;
+
+      if (net > 0) {
+        resultText += ` Massive theft. Net gain ${formatMoney(net)}.`;
+      } else if (net < 0) {
+        resultText += ` Horrific mistake. Net loss ${formatMoney(Math.abs(net))}.`;
+      } else {
+        resultText += ` Somehow it changed nothing.`;
+      }
+
+      return {
+        text: resultText,
+        amount: net
+      };
+    }
+
+    default:
+      return {
+        text: card.text,
+        amount: Number(card.amount || 0)
+      };
+  }
+}
+
+function getCardSound(type, total, explicitSound = null) {
+  if (explicitSound) return explicitSound;
+
+  if (type === "mail") {
+    if (total > 0) return "mail_good";
+    if (total < 0) return "mail_bad";
+    return "mail_weird";
+  }
+
+  if (type === "deal") {
+    if (total >= 0) return "deal_good";
+    return "deal_bad";
+  }
+
+  return "tile_land";
+}
+
+function playCard(player, room, card, type, title, explicitSound = null) {
+  const hasAction = !!card.action;
+
+  let resolved;
+  if (hasAction) {
+    resolved = resolveCardEffect(card, player, room);
+  } else {
+    applyCardAmount(player, room, card.amount);
+    resolved = {
+      text: card.text,
+      amount: Number(card.amount || 0)
+    };
+  }
+
+  const sound = getCardSound(type, resolved.amount, explicitSound);
+
+  return {
+    title,
+    text: personalizeText(resolved.text, player.name),
+    amount: resolved.amount,
+    type,
+    sound
+  };
+}
+
 function drawSpecificCards(player, room, cardList, type, title, soundCue = null) {
   const cards = [];
   let total = 0;
 
   for (const card of cardList) {
-    applyCardAmount(player, room, card.amount);
-    total += card.amount;
-
-    cards.push({
-      title,
-      text: personalizeText(card.text, player.name),
-      amount: card.amount,
-      type,
-      sound: soundCue
-    });
+    const playedCard = playCard(player, room, card, type, title, soundCue);
+    total += playedCard.amount;
+    cards.push(playedCard);
   }
 
   return { cards, total, soundCue };
@@ -390,21 +667,10 @@ function drawMailCards(player, room, count) {
 
   for (let i = 0; i < count; i++) {
     const card = drawFromRoomDeck(room, "mail");
+    const playedCard = playCard(player, room, card, "mail", "MAIL");
 
-    applyCardAmount(player, room, card.amount);
-    total += card.amount;
-
-    let sound = "mail_weird";
-    if (card.amount > 0) sound = "mail_good";
-    if (card.amount < 0) sound = "mail_bad";
-
-    cards.push({
-      title: "MAIL",
-      text: personalizeText(card.text, player.name),
-      amount: card.amount,
-      type: "mail",
-      sound
-    });
+    total += playedCard.amount;
+    cards.push(playedCard);
   }
 
   let soundCue = "mail_weird";
@@ -418,22 +684,12 @@ function drawDealCard(player, room) {
   ensureRoomDecks(room);
 
   const card = drawFromRoomDeck(room, "deal");
-
-  applyCardAmount(player, room, card.amount);
-
-  const soundCue = card.amount >= 0 ? "deal_good" : "deal_bad";
+  const playedCard = playCard(player, room, card, "deal", "DEAL");
+  const soundCue = playedCard.amount >= 0 ? "deal_good" : "deal_bad";
 
   return {
-    cards: [
-      {
-        title: "DEAL",
-        text: personalizeText(card.text, player.name),
-        amount: card.amount,
-        type: "deal",
-        sound: soundCue
-      }
-    ],
-    total: card.amount,
+    cards: [playedCard],
+    total: playedCard.amount,
     soundCue
   };
 }
