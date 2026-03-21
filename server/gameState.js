@@ -50,12 +50,23 @@ function getCurrentPlayer(room) {
     return null;
   }
 
+  // 🔥 FIX: if turnIndex somehow points to nothing, reset safely
+  if (!room.players[room.turnIndex]) {
+    room.turnIndex = 0;
+  }
+
   return room.players[room.turnIndex] || null;
 }
 
 function nextTurn(room) {
   if (!room || !Array.isArray(room.players) || !room.players.length) return;
+
   room.turnIndex = (room.turnIndex + 1) % room.players.length;
+
+  // 🔥 FIX: ensure turnIndex always points to a valid player
+  if (!room.players[room.turnIndex]) {
+    room.turnIndex = 0;
+  }
 }
 
 module.exports = {

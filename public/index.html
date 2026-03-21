@@ -11,11 +11,11 @@
 </head>
 <body>
 
-  <audio id="bgMusic" loop>
+  <audio id="bgMusic" loop preload="auto">
     <source src="money-song.mp3" type="audio/mpeg">
   </audio>
 
-  <div id="moneyBg">
+  <div id="moneyBg" aria-hidden="true">
     <span class="cash cash1">$</span>
     <span class="cash cash2">💸</span>
     <span class="cash cash3">$</span>
@@ -37,8 +37,8 @@
         </div>
 
         <div class="inputStack">
-          <input id="nameInput" placeholder="Enter name">
-          <input id="roomCodeInput" placeholder="Room Code">
+          <input id="nameInput" placeholder="Enter name" autocomplete="nickname" maxlength="20">
+          <input id="roomCodeInput" placeholder="Room Code" autocomplete="off" autocapitalize="characters" maxlength="12">
         </div>
 
         <div class="avatarSetupCard">
@@ -67,8 +67,8 @@
         </div>
 
         <div class="buttonRow">
-          <button id="createRoomBtn" class="primaryBtn">Create Room</button>
-          <button id="joinRoomBtn" class="secondaryBtn">Join Room</button>
+          <button id="createRoomBtn" class="primaryBtn" type="button">Create Room</button>
+          <button id="joinRoomBtn" class="secondaryBtn" type="button">Join Room</button>
         </div>
 
         <p id="message" class="message"></p>
@@ -92,8 +92,8 @@
             <ul id="playerList"></ul>
 
             <div class="buttonRow">
-              <button id="startGameBtn" class="primaryBtn hidden">Start Game</button>
-              <button id="leaveLobbyBtn" class="secondaryBtn">Leave</button>
+              <button id="startGameBtn" class="primaryBtn hidden" type="button">Start Game</button>
+              <button id="leaveLobbyBtn" class="secondaryBtn" type="button">Leave</button>
             </div>
 
             <p id="lobbyMessage" class="message"></p>
@@ -104,8 +104,8 @@
             <div id="lobbyChatList" class="chatList"></div>
 
             <div class="chatInputRow">
-              <input id="lobbyChatInput" placeholder="Type in chat">
-              <button id="sendLobbyChatBtn" class="chatSendBtn">Send</button>
+              <input id="lobbyChatInput" placeholder="Type in chat" maxlength="180">
+              <button id="sendLobbyChatBtn" class="chatSendBtn" type="button">Send</button>
             </div>
           </div>
         </div>
@@ -128,10 +128,11 @@
               <div class="face face5"><span class="pip topLeft"></span><span class="pip topRight"></span><span class="pip center"></span><span class="pip bottomLeft"></span><span class="pip bottomRight"></span></div>
               <div class="face face6"><span class="pip topLeft"></span><span class="pip topRight"></span><span class="pip midLeft"></span><span class="pip midRight"></span><span class="pip bottomLeft"></span><span class="pip bottomRight"></span></div>
             </div>
+
             <div id="diceValueText" class="diceValueText">Ready</div>
 
             <div class="buttonRow narrowRow">
-              <button id="rollBtn" class="primaryBtn">Roll</button>
+              <button id="rollBtn" class="primaryBtn" type="button">Roll</button>
             </div>
 
             <p id="rollMessage" class="message"></p>
@@ -190,13 +191,13 @@
             <div class="hudPill">Room: <span id="gameRoomCodeShort">----</span></div>
             <div class="hudPill">Bank: <span id="bankAmount">$0</span></div>
             <div class="hudPill">Turn: <span id="currentTurnText">Waiting...</span></div>
-            <button id="musicToggleBtn" class="hudMusicBtn">Music: OFF</button>
+            <button id="musicToggleBtn" class="hudMusicBtn" type="button">Music: OFF</button>
           </div>
 
           <div class="sideCard mobileTurnOrder">
             <div id="turnInfoText">Waiting for the next turn.</div>
             <div class="actionBar mobileStickyBar" style="margin-top: 12px;">
-              <button id="rollTurnBtn" class="primaryBtn">Roll Turn</button>
+              <button id="rollTurnBtn" class="primaryBtn" type="button">Roll Turn</button>
             </div>
           </div>
 
@@ -389,8 +390,8 @@
             <div id="gameChatList" class="chatList gameChat"></div>
 
             <div class="chatInputRow">
-              <input id="gameChatInput" placeholder="Talk trash...">
-              <button id="sendGameChatBtn" class="chatSendBtn">Send</button>
+              <input id="gameChatInput" placeholder="Talk trash..." maxlength="180">
+              <button id="sendGameChatBtn" class="chatSendBtn" type="button">Send</button>
             </div>
           </div>
         </div>
