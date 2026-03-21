@@ -19,6 +19,21 @@ function clampRoomBank(room, fallback = 50000) {
   }
 }
 
+function ensureRoomPot(room) {
+  if (!room) return;
+  if (!Number.isFinite(Number(room.pot))) {
+    room.pot = 0;
+  }
+}
+
+function addToPot(room, amount) {
+  if (!room) return;
+  ensureRoomPot(room);
+  const value = safeNumber(amount);
+  if (value <= 0) return;
+  room.pot += value;
+}
+
 function getTileAtPosition(position) {
   if (position < 0 || position >= board.length) return null;
   return board[position];
@@ -217,7 +232,7 @@ const MAIL_CARDS = [
   { text: "This is a certified waste-of-your-time letter.", amount: 0 },
   { text: "The mailman laughed when he handed you this.", amount: 0 },
   { text: "You got mail! Unfortunately, it's useless.", amount: 0 },
-  { text: "This letter just says: 'you fat fuck.' No money included.", amount: 0 },
+  { text: "This letter just says 'you fat fuck.' No money included.", amount: 0 },
   { text: "We regret to inform you that you're still you.", amount: 0 },
   { text: "No money. No help. Just disrespect.", amount: 0 },
   { text: "This letter is here to remind you you're behind in life.", amount: 0 },
@@ -765,6 +780,7 @@ function handleTile(room, player, roll) {
   const tile = getTileAtPosition(player.position);
   ensurePlayerInventory(player);
   ensureRoomDecks(room);
+  ensureRoomPot(room);
 
   if (!tile) {
     return {
@@ -890,17 +906,21 @@ function handleTile(room, player, roll) {
       break;
     }
 
-    case "ski":
+    case "ski": {
       removeMoney(player, room, tile.cost);
-      message = `${player.name} paid ${formatMoney(tile.cost)} for Top Golf.`;
+      addToPot(room, tile.cost);
+      message = `${player.name} paid ${formatMoney(tile.cost)} for Top Golf. That money went into the pot.`;
       soundCue = "money_loss";
       break;
+    }
 
-    case "charity":
+    case "charity": {
       removeMoney(player, room, tile.cost);
-      message = `${player.name} donated ${formatMoney(tile.cost)} to charity. Very noble. Very broke.`;
+      addToPot(room, tile.cost);
+      message = `${player.name} donated ${formatMoney(tile.cost)} to charity. Very noble. Very broke. That money went into the pot.`;
       soundCue = "money_loss";
       break;
+    }
 
     case "yardsale": {
       const cost = roll * 100;
@@ -927,6 +947,7 @@ function handleTile(room, player, roll) {
           const amount = charityRoll * 100;
           otherPlayer.cash -= amount;
           room.bank += amount;
+          addToPot(room, amount);
           total += amount;
         }
       });

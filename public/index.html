@@ -112,7 +112,7 @@
       </div>
     </div>
 
-    <!-- ================= OLD ROLL SCREEN (kept for compatibility) ================= -->
+    <!-- ================= ROLL SCREEN ================= -->
     <div id="rollScreen" class="screen hidden">
       <div class="panel rollPanel">
         <h1>Roll Phase</h1>
@@ -132,7 +132,7 @@
             <div id="diceValueText" class="diceValueText">Ready</div>
 
             <div class="buttonRow narrowRow">
-              <button id="rollBtn" class="primaryBtn" type="button">Roll</button>
+              <button id="rollBtn" class="primaryBtn" type="button">🎲 Roll</button>
             </div>
 
             <p id="rollMessage" class="message"></p>
@@ -145,7 +145,7 @@
             </div>
 
             <div class="cardSection" style="margin-top: 16px;">
-              <h3>Turn Order</h3>
+              <h3>Round Info</h3>
               <div id="turnOrderResults" class="resultsBox"></div>
             </div>
           </div>
@@ -189,7 +189,7 @@
         <div class="boardArea">
           <div class="gameHud">
             <div class="hudPill">Room: <span id="gameRoomCodeShort">----</span></div>
-            <div class="hudPill">Bank: <span id="bankAmount">$0</span></div>
+            <div class="hudPill">Pot: <span id="bankAmount">$0</span></div>
             <div class="hudPill">Turn: <span id="currentTurnText">Waiting...</span></div>
             <button id="musicToggleBtn" class="hudMusicBtn" type="button">Music: OFF</button>
           </div>
@@ -368,7 +368,7 @@
                   </div>
                   <div class="tile" data-pos="25">
                     <span class="tileNum">26</span>
-                    <span class="tileLabel">💸 FORCED CHARITY</span>
+                    <span class="tileLabel">💝 FORCED CHARITY</span>
                     <div class="tilePieces"></div>
                   </div>
                   <div class="tile mailTile" data-pos="24">

@@ -33,201 +33,212 @@ const DEFAULT_AVATAR = {
   color: "#4fd081"
 };
 
+const POT_BATTLE_CHANCE = 0.05;
+const POT_BATTLE_COOLDOWN_TURNS = 3;
+
+// ---------------------- UTIL ----------------------
+
 function normalizeAvatar(avatar) {
-  if (!avatar || typeof avatar !== "object") {
-    return { ...DEFAULT_AVATAR };
-  }
+  if (!avatar || typeof avatar !== "object") return { ...DEFAULT_AVATAR };
 
-  const emoji =
-    typeof avatar.emoji === "string" && avatar.emoji.trim()
-      ? avatar.emoji
-      : DEFAULT_AVATAR.emoji;
-
-  const hat =
-    typeof avatar.hat === "string" && avatar.hat.trim()
-      ? avatar.hat
-      : DEFAULT_AVATAR.hat;
-
-  const color =
-    typeof avatar.color === "string" && avatar.color.trim()
-      ? avatar.color
-      : DEFAULT_AVATAR.color;
-
-  return { emoji, hat, color };
+  return {
+    emoji: avatar.emoji || DEFAULT_AVATAR.emoji,
+    hat: avatar.hat || DEFAULT_AVATAR.hat,
+    color: avatar.color || DEFAULT_AVATAR.color
+  };
 }
 
-// 🔥 NEW: highest roller starts first
-function startGameWithRoll(room) {
-  if (!room || !Array.isArray(room.players) || room.players.length < 2) return;
+function ensureExtendedRoomState(room) {
+  if (!room) return;
 
-  const rolls = room.players.map((player) => ({
-    player,
-    roll: Math.floor(Math.random() * 6) + 1
-  }));
+  if (typeof room.pot !== "number") room.pot = 0;
 
-  const highest = Math.max(...rolls.map((r) => r.roll));
-  const winners = rolls.filter((r) => r.roll === highest);
-
-  io.to(room.code).emit("startRolls", {
-    rolls: rolls.map((r) => ({
-      playerName: r.player.name,
-      roll: r.roll
-    }))
-  });
-
-  if (winners.length > 1) {
-    pushSystemMessage(room, `Tie on the starting roll at ${highest}. Rolling again...`);
-    emitRoomUpdate(io, room);
-
-    setTimeout(() => {
-      startGameWithRoll(room);
-    }, 1500);
-    return;
+  if (typeof room.turnsSinceLastPotBattle !== "number") {
+    room.turnsSinceLastPotBattle = 0;
   }
 
-  const starter = winners[0].player;
-  room.turnIndex = room.players.findIndex((p) => p.id === starter.id);
-  ensureValidTurnIndex(room);
-  room.phase = "game";
+  if (!room.startRollState) {
+    room.startRollState = {
+      active: false,
+      round: 1,
+      eligiblePlayerIds: [],
+      rolls: {}
+    };
+  }
 
-  pushSystemMessage(room, `${starter.name} rolled highest and goes first.`);
-  io.to(room.code).emit("firstPlayerChosen", {
-    playerName: starter.name
+  if (!room.potBattleState) {
+    room.potBattleState = {
+      active: false,
+      round: 1,
+      eligiblePlayerIds: [],
+      rolls: {}
+    };
+  }
+}
+
+function getPlayerName(room, id) {
+  const p = room.players.find(p => p.id === id);
+  return p ? p.name : "Unknown";
+}
+
+function shouldTriggerPotBattle(room) {
+  if (room.turnsSinceLastPotBattle < POT_BATTLE_COOLDOWN_TURNS) return false;
+  return Math.random() < POT_BATTLE_CHANCE;
+}
+
+// ---------------------- POT ----------------------
+
+function addToPot(room, amount, reason) {
+  const val = Number(amount) || 0;
+  if (val <= 0) return;
+
+  room.pot += val;
+
+  io.to(room.code).emit("potUpdated", {
+    pot: room.pot,
+    amountAdded: val,
+    reason
   });
 
-  io.to(room.code).emit("gameStarted", {
-    room: getSafeRoom(room)
-  });
-
-  sendTurnUpdate(io, room);
+  pushSystemMessage(room, `${reason} +$${val} added to pot.`);
   emitRoomUpdate(io, room);
 }
 
-function findRoomByReconnectId(reconnectId) {
-  if (!reconnectId) return null;
+// ---------------------- START ROLL ----------------------
 
-  for (const room of Object.values(rooms)) {
-    const foundPlayer = room.players.find(
-      (player) => player.reconnectId && player.reconnectId === reconnectId
-    );
+function beginStartRollPhase(room) {
+  room.phase = "start-roll";
+  room.startRollState = {
+    active: true,
+    round: 1,
+    eligiblePlayerIds: room.players.map(p => p.id),
+    rolls: {}
+  };
 
-    if (foundPlayer) {
-      return room;
-    }
-  }
+  io.to(room.code).emit("startRollPhaseBegan", {
+    players: room.players
+  });
 
-  return null;
+  pushSystemMessage(room, "Everyone roll for turn order.");
 }
 
-function findPlayerByReconnectId(room, reconnectId) {
-  if (!room || !reconnectId) return null;
+function resolveStartRollRound(room) {
+  const rolls = room.startRollState.rolls;
+  const ids = room.startRollState.eligiblePlayerIds;
 
-  return room.players.find(
-    (player) => player.reconnectId && player.reconnectId === reconnectId
-  ) || null;
-}
+  const highest = Math.max(...Object.values(rolls));
+  const winners = ids.filter(id => rolls[id] === highest);
 
-function attachSocketToRoom(socket, room, reconnectId = null) {
-  socket.join(room.code);
-  socket.data.roomCode = room.code;
-  socket.data.reconnectId = reconnectId || null;
-}
+  if (winners.length === 1) {
+    const winnerId = winners[0];
 
-function markPlayerConnected(player, socket, name, avatar) {
-  if (!player) return;
-
-  if (player.disconnectTimer) {
-    clearTimeout(player.disconnectTimer);
-    player.disconnectTimer = null;
-  }
-
-  player.id = socket.id;
-  player.connected = true;
-  player.lastSeenAt = Date.now();
-
-  if (typeof name === "string" && name.trim()) {
-    player.name = name.trim().slice(0, 16);
-  }
-
-  if (avatar) {
-    player.avatar = normalizeAvatar(avatar);
-  }
-}
-
-function decoratePlayerForReconnect(player, reconnectId) {
-  player.reconnectId = reconnectId || null;
-  player.connected = true;
-  player.disconnectTimer = null;
-  player.lastSeenAt = Date.now();
-  return player;
-}
-
-function finalizePlayerRemoval(room, playerIdToRemove) {
-  const removedIndex = room.players.findIndex((player) => player.id === playerIdToRemove);
-  if (removedIndex === -1) return;
-
-  const removedPlayer = room.players[removedIndex];
-
-  if (removedPlayer.disconnectTimer) {
-    clearTimeout(removedPlayer.disconnectTimer);
-    removedPlayer.disconnectTimer = null;
-  }
-
-  room.players.splice(removedIndex, 1);
-
-  if (room.players.length === 0) {
-    delete rooms[room.code];
-    return;
-  }
-
-  pushSystemMessage(room, `${removedPlayer.name} left the room.`);
-
-  transferHostIfNeeded(room, playerIdToRemove);
-
-  if (removedIndex < room.turnIndex) {
-    room.turnIndex -= 1;
-  }
-
-  ensureValidTurnIndex(room);
-
-  if (room.phase !== "lobby") {
+    room.turnIndex = room.players.findIndex(p => p.id === winnerId);
     room.phase = "game";
-    if (getCurrentPlayer(room)) {
-      sendTurnUpdate(io, room);
-    }
+    room.startRollState.active = false;
+
+    io.to(room.code).emit("firstPlayerChosen", { playerId: winnerId });
+
+    sendTurnUpdate(io, room);
+    emitRoomUpdate(io, room);
+    return;
   }
 
-  emitRoomUpdate(io, room);
+  room.startRollState.round++;
+  room.startRollState.eligiblePlayerIds = winners;
+  room.startRollState.rolls = {};
+
+  io.to(room.code).emit("startRollTieBreaker", { players: winners });
 }
+
+// ---------------------- POT BATTLE ----------------------
+
+function startPotBattle(room) {
+  room.phase = "pot-battle";
+
+  room.potBattleState = {
+    active: true,
+    round: 1,
+    eligiblePlayerIds: room.players.map(p => p.id),
+    rolls: {}
+  };
+
+  room.turnsSinceLastPotBattle = 0;
+
+  io.to(room.code).emit("globalAlert", {
+    type: "pot",
+    text: `💰 POT BATTLE FOR $${room.pot}!`
+  });
+
+  io.to(room.code).emit("potBattleStarted", {
+    pot: room.pot
+  });
+
+  pushSystemMessage(room, `POT BATTLE for $${room.pot}!`);
+}
+
+function resolvePotBattleRound(room) {
+  const rolls = room.potBattleState.rolls;
+  const ids = room.potBattleState.eligiblePlayerIds;
+
+  const highest = Math.max(...Object.values(rolls));
+  const winners = ids.filter(id => rolls[id] === highest);
+
+  if (winners.length === 1) {
+    const winner = room.players.find(p => p.id === winners[0]);
+
+    if (winner) {
+      winner.money += room.pot;
+    }
+
+    io.to(room.code).emit("potBattleWinner", {
+      winnerId: winner.id,
+      amount: room.pot
+    });
+
+    room.pot = 0;
+    room.phase = "game";
+    room.potBattleState.active = false;
+
+    sendTurnUpdate(io, room);
+    emitRoomUpdate(io, room);
+    return;
+  }
+
+  room.potBattleState.round++;
+  room.potBattleState.eligiblePlayerIds = winners;
+  room.potBattleState.rolls = {};
+
+  io.to(room.code).emit("potBattleTieBreaker", {
+    players: winners
+  });
+}
+
+function maybeTriggerPotBattle(room) {
+  if (room.phase !== "game") return;
+  if (room.pot <= 0) return;
+
+  if (shouldTriggerPotBattle(room)) {
+    startPotBattle(room);
+  } else {
+    room.turnsSinceLastPotBattle++;
+  }
+}
+
+// ---------------------- SOCKET ----------------------
 
 io.on("connection", (socket) => {
-  socket.on("createRoom", ({ name, avatar, reconnectId }) => {
-    const trimmedName = String(name || "").trim().slice(0, 16);
-    const normalizedAvatar = normalizeAvatar(avatar);
-    const safeReconnectId = String(reconnectId || "").trim();
 
-    if (!trimmedName) {
-      socket.emit("errorMessage", "Please enter your name.");
-      return;
-    }
-
+  socket.on("createRoom", ({ name, avatar }) => {
     const code = generateRoomCode(rooms);
     const room = createRoom(code, socket.id);
 
-    const player = createPlayer(
-      socket.id,
-      trimmedName,
-      normalizedAvatar
-    );
+    ensureExtendedRoomState(room);
 
-    decoratePlayerForReconnect(player, safeReconnectId);
-
+    const player = createPlayer(socket.id, name, normalizeAvatar(avatar));
     room.players.push(player);
-    pushSystemMessage(room, `${trimmedName} created the room.`);
 
     rooms[code] = room;
-
-    attachSocketToRoom(socket, room, safeReconnectId);
+    socket.join(code);
 
     socket.emit("roomJoined", {
       room: getSafeRoom(room),
@@ -237,88 +248,14 @@ io.on("connection", (socket) => {
     emitRoomUpdate(io, room);
   });
 
-  socket.on("joinRoom", ({ name, roomCode, avatar, reconnectId }) => {
-    const trimmedName = String(name || "").trim().slice(0, 16);
-    const code = String(roomCode || "").trim().toUpperCase();
-    const normalizedAvatar = normalizeAvatar(avatar);
-    const safeReconnectId = String(reconnectId || "").trim();
+  socket.on("joinRoom", ({ name, roomCode, avatar }) => {
+    const room = rooms[roomCode];
+    if (!room) return;
 
-    if (!trimmedName) {
-      socket.emit("errorMessage", "Please enter your name.");
-      return;
-    }
-
-    if (!code && !safeReconnectId) {
-      socket.emit("errorMessage", "Please enter a room code.");
-      return;
-    }
-
-    let room = null;
-    let reconnectingPlayer = null;
-
-    if (safeReconnectId) {
-      const reconnectRoom = findRoomByReconnectId(safeReconnectId);
-      const reconnectPlayer = reconnectRoom
-        ? findPlayerByReconnectId(reconnectRoom, safeReconnectId)
-        : null;
-
-      if (reconnectRoom && reconnectPlayer) {
-        room = reconnectRoom;
-        reconnectingPlayer = reconnectPlayer;
-      }
-    }
-
-    if (!room) {
-      room = rooms[code];
-    }
-
-    if (!room) {
-      socket.emit("errorMessage", "Room not found.");
-      return;
-    }
-
-    if (reconnectingPlayer) {
-      markPlayerConnected(reconnectingPlayer, socket, trimmedName, normalizedAvatar);
-      attachSocketToRoom(socket, room, safeReconnectId);
-
-      pushSystemMessage(room, `${reconnectingPlayer.name} rejoined the room.`);
-
-      socket.emit("roomJoined", {
-        room: getSafeRoom(room),
-        yourId: socket.id
-      });
-
-      emitRoomUpdate(io, room);
-
-      if (room.phase !== "lobby") {
-        sendTurnUpdate(io, room);
-      }
-
-      return;
-    }
-
-    if (room.phase !== "lobby") {
-      socket.emit("errorMessage", "That game already started.");
-      return;
-    }
-
-    if (room.players.length >= MAX_PLAYERS) {
-      socket.emit("errorMessage", "That room is full.");
-      return;
-    }
-
-    const player = createPlayer(
-      socket.id,
-      trimmedName,
-      normalizedAvatar
-    );
-
-    decoratePlayerForReconnect(player, safeReconnectId);
-
+    const player = createPlayer(socket.id, name, normalizeAvatar(avatar));
     room.players.push(player);
-    pushSystemMessage(room, `${trimmedName} joined the room.`);
 
-    attachSocketToRoom(socket, room, safeReconnectId);
+    socket.join(room.code);
 
     socket.emit("roomJoined", {
       room: getSafeRoom(room),
@@ -332,99 +269,71 @@ io.on("connection", (socket) => {
     const room = getRoomBySocketId(rooms, socket.id);
     if (!room) return;
 
-    if (room.hostId !== socket.id) {
-      socket.emit("errorMessage", "Only the host can start the game.");
-      return;
+    beginStartRollPhase(room);
+  });
+
+  socket.on("rollForStart", () => {
+    const room = getRoomBySocketId(rooms, socket.id);
+    if (!room) return;
+
+    const roll = Math.floor(Math.random() * 6) + 1;
+    room.startRollState.rolls[socket.id] = roll;
+
+    io.to(room.code).emit("startRollSubmitted", {
+      playerId: socket.id,
+      roll
+    });
+
+    if (Object.keys(room.startRollState.rolls).length === room.startRollState.eligiblePlayerIds.length) {
+      resolveStartRollRound(room);
     }
-
-    if (room.players.length < 2) {
-      socket.emit("errorMessage", "You need at least 2 players to start.");
-      return;
-    }
-
-    pushSystemMessage(room, "Rolling to decide who goes first...");
-    emitRoomUpdate(io, room);
-
-    startGameWithRoll(room);
   });
 
   socket.on("rollTurn", () => {
     const room = getRoomBySocketId(rooms, socket.id);
     if (!room) return;
 
-    if (room.phase !== "game") {
-      socket.emit("errorMessage", "The game is busy right now.");
-      return;
-    }
+    const player = getCurrentPlayer(room);
+    if (!player || player.id !== socket.id) return;
 
-    const currentPlayer = getCurrentPlayer(room);
-    if (!currentPlayer) return;
+    handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage);
 
-    if (!currentPlayer || currentPlayer.id !== socket.id) {
-      socket.emit("errorMessage", "It is not your turn.");
-      return;
-    }
-
-    handlePlayerRoll(io, room, currentPlayer, emitRoomUpdate, pushSystemMessage);
+    setTimeout(() => {
+      maybeTriggerPotBattle(room);
+    }, 300);
   });
 
-  socket.on("sendChatMessage", ({ text }) => {
+  socket.on("rollForPotBattle", () => {
     const room = getRoomBySocketId(rooms, socket.id);
     if (!room) return;
 
-    const player = getPlayerBySocketId(room, socket.id);
-    if (!player) return;
+    const roll = Math.floor(Math.random() * 6) + 1;
+    room.potBattleState.rolls[socket.id] = roll;
 
-    const trimmedText = String(text || "").trim().slice(0, 180);
-    if (!trimmedText) return;
-
-    room.chat.push({
-      system: false,
-      name: player.name,
-      text: trimmedText
+    io.to(room.code).emit("potBattleRollSubmitted", {
+      playerId: socket.id,
+      roll
     });
 
-    emitRoomUpdate(io, room);
+    if (Object.keys(room.potBattleState.rolls).length === room.potBattleState.eligiblePlayerIds.length) {
+      resolvePotBattleRound(room);
+    }
   });
 
-  socket.on("disconnect", () => {
+  socket.on("addMoneyToPot", ({ amount, reason }) => {
     const room = getRoomBySocketId(rooms, socket.id);
     if (!room) return;
 
-    const player = getPlayerBySocketId(room, socket.id);
-    if (!player) return;
+    const allowed = ["charity", "top golf", "fundraiser", "donation", "event"];
 
-    player.connected = false;
-    player.lastSeenAt = Date.now();
+    if (!allowed.includes((reason || "").toLowerCase())) return;
 
-    if (player.disconnectTimer) {
-      clearTimeout(player.disconnectTimer);
-      player.disconnectTimer = null;
-    }
-
-    pushSystemMessage(room, `${player.name} disconnected. Waiting for them to come back...`);
-    emitRoomUpdate(io, room);
-
-    const reconnectIdAtDisconnect = player.reconnectId;
-    const playerIdAtDisconnect = player.id;
-
-    player.disconnectTimer = setTimeout(() => {
-      const stillThere = room.players.find(
-        (p) =>
-          p.reconnectId &&
-          p.reconnectId === reconnectIdAtDisconnect
-      );
-
-      if (!stillThere) return;
-      if (stillThere.connected) return;
-
-      finalizePlayerRemoval(room, playerIdAtDisconnect);
-    }, RECONNECT_GRACE_MS);
+    addToPot(room, amount, reason);
   });
+
 });
+
+// ----------------------
 
 const PORT = process.env.PORT || 3000;
-
-http.listen(PORT, () => {
-  console.log(`Running on port ${PORT}`);
-});
+http.listen(PORT, () => console.log("Running on port", PORT));

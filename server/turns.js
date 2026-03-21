@@ -23,6 +23,7 @@ function getSafePlayer(player) {
     name: player.name,
     position: player.position,
     cash: player.cash,
+    money: typeof player.money === "number" ? player.money : player.cash,
     avatar: player.avatar,
     connected: player.connected !== false,
     inventory: {
@@ -37,6 +38,7 @@ function getSafeRoomSnapshot(room) {
     hostId: room.hostId,
     phase: room.phase,
     bank: room.bank,
+    pot: typeof room.pot === "number" ? room.pot : 0,
     turnIndex: room.turnIndex,
     currentPlayerId: getCurrentPlayer(room)?.id || null,
     players: room.players.map(getSafePlayer),
@@ -77,66 +79,6 @@ function beginNextTurn(io, room, emitRoomUpdate) {
   emitRoomUpdate(io, room);
 }
 
-// ============================
-// POT BATTLE SYSTEM
-// ============================
-function runPotBattle(io, room, emitRoomUpdate, pushSystemMessage) {
-  if (!room || !room.players.length) return;
-
-  const eligiblePlayers = room.players.filter((player) => player.connected !== false);
-  if (!eligiblePlayers.length) {
-    beginNextTurn(io, room, emitRoomUpdate);
-    return;
-  }
-
-  room.phase = "battle";
-  emitRoomUpdate(io, room);
-
-  const rolls = eligiblePlayers.map((player) => ({
-    player,
-    roll: Math.floor(Math.random() * 6) + 1
-  }));
-
-  const highest = Math.max(...rolls.map((r) => r.roll));
-  const winners = rolls.filter((r) => r.roll === highest);
-
-  io.to(room.code).emit("potBattleRolls", {
-    rolls: rolls.map((r) => ({
-      playerName: r.player.name,
-      roll: r.roll
-    }))
-  });
-
-  setTimeout(() => {
-    if (winners.length > 1) {
-      pushSystemMessage(room, `Tie for pot battle at ${highest}. Rolling again...`);
-      runPotBattle(io, room, emitRoomUpdate, pushSystemMessage);
-      return;
-    }
-
-    const winner = winners[0].player;
-    const pot = Number(room.bank || 0);
-
-    winner.cash += pot;
-    room.bank = 0;
-    safelyClampRoomBank(room, 0);
-
-    pushSystemMessage(room, `${winner.name} WON THE POT and collected ${formatMoney(pot)}.`);
-
-    io.to(room.code).emit("potBattleWinner", {
-      playerName: winner.name,
-      amount: pot,
-      room: getSafeRoomSnapshot(room)
-    });
-
-    emitRoomUpdate(io, room);
-
-    setTimeout(() => {
-      beginNextTurn(io, room, emitRoomUpdate);
-    }, 2500);
-  }, 2000);
-}
-
 function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   if (!room || !player) return;
 
@@ -149,7 +91,7 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   emitRoomUpdate(io, room);
 
   const roll = Math.floor(Math.random() * 6) + 1;
-  const from = player.position;
+  const from = Number(player.position || 0);
   const rawTo = from + roll;
 
   const passedPlayday = rawTo >= board.length && from !== board.length - 1;
@@ -166,8 +108,13 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
     player.position = to;
 
     if (passedPlayday) {
-      player.cash += PLAYDAY_AMOUNT;
-      room.bank -= PLAYDAY_AMOUNT;
+      player.cash = Number(player.cash || 0) + PLAYDAY_AMOUNT;
+
+      if (typeof player.money === "number") {
+        player.money += PLAYDAY_AMOUNT;
+      }
+
+      room.bank = Number(room.bank || 0) - PLAYDAY_AMOUNT;
       safelyClampRoomBank(room);
 
       pushSystemMessage(
@@ -194,13 +141,6 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
     emitRoomUpdate(io, room);
 
     setTimeout(() => {
-      // 20% chance to trigger pot battle before tile resolution
-      if (Math.random() < 0.2) {
-        pushSystemMessage(room, "⚔️ POT BATTLE TRIGGERED! Everyone rolls for the bank!");
-        runPotBattle(io, room, emitRoomUpdate, pushSystemMessage);
-        return;
-      }
-
       room.phase = "resolving";
 
       const beforeCash = Number(player.cash || 0);
@@ -216,6 +156,12 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
 
       const afterCash = Number(player.cash || 0);
       const delta = afterCash - beforeCash;
+
+      if (typeof player.money !== "number") {
+        player.money = afterCash;
+      } else {
+        player.money = afterCash;
+      }
 
       safelyClampRoomBank(room);
       pushSystemMessage(room, result.message);

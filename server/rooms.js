@@ -91,6 +91,11 @@ function getSafePlayer(player) {
     name: player?.name || "Player",
     position: Number(player?.position || 0),
     cash: Number(player?.cash || 0),
+    money: Number(
+      typeof player?.money === "number"
+        ? player.money
+        : player?.cash || 0
+    ),
     avatar: player?.avatar || null,
     connected: player?.connected !== false,
     deals: Array.isArray(player?.deals) ? player.deals : [],
@@ -115,10 +120,41 @@ function getSafeRoom(room) {
     hostId: room?.hostId || null,
     phase: room?.phase || "lobby",
     bank: Number(room?.bank || 0),
+    pot: Number(room?.pot || 0),
     turnIndex: Number(room?.turnIndex || 0),
     currentPlayerId: getCurrentPlayer(room)?.id || null,
     players: safePlayers,
-    chat: Array.isArray(room?.chat) ? room.chat.slice(-50) : []
+    chat: Array.isArray(room?.chat) ? room.chat.slice(-50) : [],
+    startRollState: room?.startRollState
+      ? {
+          active: !!room.startRollState.active,
+          round: Number(room.startRollState.round || 1),
+          eligiblePlayerIds: Array.isArray(room.startRollState.eligiblePlayerIds)
+            ? room.startRollState.eligiblePlayerIds
+            : [],
+          rolls: room.startRollState.rolls || {}
+        }
+      : {
+          active: false,
+          round: 1,
+          eligiblePlayerIds: [],
+          rolls: {}
+        },
+    potBattleState: room?.potBattleState
+      ? {
+          active: !!room.potBattleState.active,
+          round: Number(room.potBattleState.round || 1),
+          eligiblePlayerIds: Array.isArray(room.potBattleState.eligiblePlayerIds)
+            ? room.potBattleState.eligiblePlayerIds
+            : [],
+          rolls: room.potBattleState.rolls || {}
+        }
+      : {
+          active: false,
+          round: 1,
+          eligiblePlayerIds: [],
+          rolls: {}
+        }
   };
 }
 

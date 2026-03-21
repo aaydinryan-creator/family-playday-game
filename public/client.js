@@ -103,26 +103,6 @@ const avatarPreview = document.getElementById("avatarPreview");
 const bgMusic = document.getElementById("bgMusic");
 const musicToggleBtn = document.getElementById("musicToggleBtn");
 
-function getReconnectId() {
-  let reconnectId = sessionStorage.getItem("playday_reconnect_id");
-  if (!reconnectId) {
-    reconnectId = `playday_${Math.random().toString(36).slice(2)}_${Date.now()}`;
-    sessionStorage.setItem("playday_reconnect_id", reconnectId);
-  }
-  return reconnectId;
-}
-
-function clearReconnectId() {
-  sessionStorage.removeItem("playday_reconnect_id");
-}
-
-let reconnectId = getReconnectId();
-
-function resetReconnectId() {
-  clearReconnectId();
-  reconnectId = getReconnectId();
-}
-
 function isTypingInField(target) {
   if (!target) return false;
   const tag = String(target.tagName || "").toLowerCase();
@@ -371,6 +351,10 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getPlayerMoney(player) {
+  return Number(player?.money ?? player?.cash ?? 0);
+}
+
 function createAvatarMarkup(avatar, extraClass = "") {
   const safeAvatar = avatar || { emoji: "😎", hat: "🧢", color: "#4fd081" };
   const hat = safeAvatar.hat === "❌" ? "" : safeAvatar.hat;
@@ -519,12 +503,13 @@ function renderRoom(room) {
   if (roomCodeDisplay) roomCodeDisplay.textContent = room.code || "----";
   if (rollRoomCodeDisplay) rollRoomCodeDisplay.textContent = room.code || "----";
   if (gameRoomCodeShort) gameRoomCodeShort.textContent = room.code || "----";
-  if (bankAmount) bankAmount.textContent = formatMoney(room.bank);
+  if (bankAmount) bankAmount.textContent = formatMoney(room.pot ?? room.bank ?? 0);
 
   renderPlayers(room);
   renderGameMoneyBoard(room.players || []);
   renderChat(room.chat || []);
   renderBoardPieces(room.players || []);
+  renderRollScreenDetails(room);
 
   if (startGameBtn) {
     const amHost = room.hostId === myId;
@@ -537,13 +522,9 @@ function renderRoom(room) {
 
   if (room.phase === "lobby") {
     showScreen("lobby");
-  } else if (
-    room.phase === "game" ||
-    room.phase === "rolling" ||
-    room.phase === "moving" ||
-    room.phase === "resolving" ||
-    room.phase === "battle"
-  ) {
+  } else if (room.phase === "start-roll" || room.phase === "pot-battle") {
+    showScreen("roll");
+  } else {
     showScreen("game");
   }
 }
@@ -552,7 +533,7 @@ function renderPlayers(room) {
   if (!playerList) return;
 
   const sortedPlayers = [...(room.players || [])].sort((a, b) => {
-    return Number(b.cash || 0) - Number(a.cash || 0);
+    return getPlayerMoney(b) - getPlayerMoney(a);
   });
 
   playerList.innerHTML = "";
@@ -596,9 +577,7 @@ function renderPlayers(room) {
 function renderGameMoneyBoard(players) {
   if (!gamePlayersList) return;
 
-  const sortedPlayers = [...players].sort((a, b) => {
-    return Number(b.cash || 0) - Number(a.cash || 0);
-  });
+  const sortedPlayers = [...players].sort((a, b) => getPlayerMoney(b) - getPlayerMoney(a));
 
   gamePlayersList.innerHTML = "";
 
@@ -610,7 +589,7 @@ function renderGameMoneyBoard(players) {
         ${createAvatarMarkup(player.avatar)}
         <span class="moneyName">#${index + 1} ${escapeHtml(player.name)}</span>
       </div>
-      <span class="moneyCash">${formatMoney(player.cash)} · ${getInventoryCount(player)} items${player.connected === false ? " · offline" : ""}</span>
+      <span class="moneyCash">${formatMoney(getPlayerMoney(player))} · ${getInventoryCount(player)} items${player.connected === false ? " · offline" : ""}</span>
     `;
     gamePlayersList.appendChild(row);
   });
@@ -658,6 +637,78 @@ function renderChat(chatItems) {
   if (gameChatList) {
     gameChatList.innerHTML = html;
     gameChatList.scrollTop = gameChatList.scrollHeight;
+  }
+}
+
+function renderRollScreenDetails(room) {
+  if (!room || !rollResults) return;
+
+  rollResults.innerHTML = "";
+  if (turnOrderResults) turnOrderResults.innerHTML = "";
+
+  const startState = room.startRollState || null;
+  const potState = room.potBattleState || null;
+
+  if (room.phase === "start-roll" && startState) {
+    const eligible = new Set(startState.eligiblePlayerIds || []);
+    const rolls = startState.rolls || {};
+
+    const players = (room.players || []).filter((p) => eligible.has(p.id));
+
+    players.forEach((player) => {
+      const row = document.createElement("div");
+      row.className = "moneyRow";
+      const hasRolled = typeof rolls[player.id] === "number";
+      if (hasRolled) row.classList.add("rolled");
+
+      row.innerHTML = `
+        <div class="moneyNameWrap">
+          ${createAvatarMarkup(player.avatar)}
+          <span class="moneyName">${escapeHtml(player.name)}</span>
+        </div>
+        <span class="moneyCash">${hasRolled ? `rolled ${rolls[player.id]}` : "waiting..."}</span>
+      `;
+      rollResults.appendChild(row);
+    });
+
+    if (turnOrderResults) {
+      turnOrderResults.innerHTML = `
+        <div class="chatLine systemLine">
+          Start Roll · Round ${Number(startState.round || 1)}
+        </div>
+      `;
+    }
+  }
+
+  if (room.phase === "pot-battle" && potState) {
+    const eligible = new Set(potState.eligiblePlayerIds || []);
+    const rolls = potState.rolls || {};
+
+    const players = (room.players || []).filter((p) => eligible.has(p.id));
+
+    players.forEach((player) => {
+      const row = document.createElement("div");
+      row.className = "moneyRow";
+      const hasRolled = typeof rolls[player.id] === "number";
+      if (hasRolled) row.classList.add("rolled");
+
+      row.innerHTML = `
+        <div class="moneyNameWrap">
+          ${createAvatarMarkup(player.avatar)}
+          <span class="moneyName">${escapeHtml(player.name)}</span>
+        </div>
+        <span class="moneyCash">${hasRolled ? `rolled ${rolls[player.id]}` : "waiting..."}</span>
+      `;
+      rollResults.appendChild(row);
+    });
+
+    if (turnOrderResults) {
+      turnOrderResults.innerHTML = `
+        <div class="chatLine systemLine potBattleGlow">
+          POT BATTLE · Pot ${formatMoney(room.pot || 0)} · Round ${Number(potState.round || 1)}
+        </div>
+      `;
+    }
   }
 }
 
@@ -937,7 +988,7 @@ function maybeShowTilePopup(eventType, title, message, playerName) {
     return;
   }
 
-  if (eventType === "charity" || eventType === "walk" || eventType === "ski" || eventType === "yardsale") {
+  if (eventType === "charity" || eventType === "walk" || eventType === "ski" || eventType === "yardsale" || eventType === "top golf" || eventType === "topgolf") {
     showEvent(title || "Ouch", message || `${playerName} landed on a brutal tile.`, "default", 3800);
     return;
   }
@@ -1022,14 +1073,45 @@ function updateTurnUI() {
   if (currentTurnText) currentTurnText.textContent = name;
 
   if (turnInfoText) {
-    turnInfoText.textContent =
-      currentTurnPlayerId === myId
-        ? "It is your turn. Press Roll Turn."
-        : `${name} is taking their turn.`;
+    if (currentRoom.phase === "start-roll") {
+      const eligible = (currentRoom.startRollState?.eligiblePlayerIds || []).includes(myId);
+      const alreadyRolled = typeof currentRoom.startRollState?.rolls?.[myId] === "number";
+      turnInfoText.textContent = eligible
+        ? (alreadyRolled ? "You already rolled. Waiting for others." : "Roll to decide who goes first.")
+        : "Waiting for players to finish the start roll.";
+    } else if (currentRoom.phase === "pot-battle") {
+      const eligible = (currentRoom.potBattleState?.eligiblePlayerIds || []).includes(myId);
+      const alreadyRolled = typeof currentRoom.potBattleState?.rolls?.[myId] === "number";
+      turnInfoText.textContent = eligible
+        ? (alreadyRolled ? "You already rolled for the pot. Waiting for others." : "Roll for the pot.")
+        : "Waiting for the pot battle to finish.";
+    } else {
+      turnInfoText.textContent =
+        currentTurnPlayerId === myId
+          ? "It is your turn. Press Roll Turn."
+          : `${name} is taking their turn.`;
+    }
   }
 
   if (rollTurnBtn) {
-    rollTurnBtn.disabled = currentTurnPlayerId !== myId || sharedTurnRollAnimating;
+    rollTurnBtn.disabled = currentTurnPlayerId !== myId || sharedTurnRollAnimating || currentRoom.phase !== "game";
+  }
+
+  if (rollBtn) {
+    if (currentRoom.phase === "start-roll") {
+      const eligible = (currentRoom.startRollState?.eligiblePlayerIds || []).includes(myId);
+      const alreadyRolled = typeof currentRoom.startRollState?.rolls?.[myId] === "number";
+      rollBtn.disabled = !eligible || alreadyRolled;
+      rollBtn.textContent = alreadyRolled ? "Rolled" : "🎲 Roll For Start";
+    } else if (currentRoom.phase === "pot-battle") {
+      const eligible = (currentRoom.potBattleState?.eligiblePlayerIds || []).includes(myId);
+      const alreadyRolled = typeof currentRoom.potBattleState?.rolls?.[myId] === "number";
+      rollBtn.disabled = !eligible || alreadyRolled;
+      rollBtn.textContent = alreadyRolled ? "Rolled" : "💰 Roll For Pot";
+    } else {
+      rollBtn.disabled = true;
+      rollBtn.textContent = "🎲 Roll";
+    }
   }
 
   renderBoardPieces(currentRoom.players || []);
@@ -1043,12 +1125,10 @@ function primeAudioAndMusic() {
 createRoomBtn?.addEventListener("click", () => {
   primeAudioAndMusic();
   setMessage("");
-  resetReconnectId();
 
   socket.emit("createRoom", {
     name: nameInput?.value || "",
-    avatar: getSelectedAvatar(),
-    reconnectId
+    avatar: getSelectedAvatar()
   });
 });
 
@@ -1059,8 +1139,7 @@ joinRoomBtn?.addEventListener("click", () => {
   socket.emit("joinRoom", {
     name: nameInput?.value || "",
     roomCode: roomCodeInput?.value || "",
-    avatar: getSelectedAvatar(),
-    reconnectId
+    avatar: getSelectedAvatar()
   });
 });
 
@@ -1071,18 +1150,28 @@ startGameBtn?.addEventListener("click", () => {
 });
 
 leaveLobbyBtn?.addEventListener("click", () => {
-  clearReconnectId();
   enableIntentionalPageExit();
   window.location.reload();
 });
 
 rollBtn?.addEventListener("click", () => {
-  setRollMessage("This phase is no longer used in this version.");
+  primeAudioAndMusic();
+
+  if (!currentRoom) return;
+
+  if (currentRoom.phase === "start-roll") {
+    socket.emit("rollForStart");
+    return;
+  }
+
+  if (currentRoom.phase === "pot-battle") {
+    socket.emit("rollForPotBattle");
+  }
 });
 
 rollTurnBtn?.addEventListener("click", () => {
   primeAudioAndMusic();
-  if (currentTurnPlayerId !== myId || sharedTurnRollAnimating) return;
+  if (currentTurnPlayerId !== myId || sharedTurnRollAnimating || currentRoom?.phase !== "game") return;
   socket.emit("rollTurn");
 });
 
@@ -1115,7 +1204,6 @@ socket.on("roomJoined", ({ room, yourId }) => {
   myId = yourId;
   renderRoom(room);
   updateTurnUI();
-  showScreen(room.phase === "lobby" ? "lobby" : "game");
 });
 
 socket.on("roomUpdated", (room) => {
@@ -1125,19 +1213,59 @@ socket.on("roomUpdated", (room) => {
   updateTurnUI();
 });
 
-socket.on("startRolls", ({ rolls }) => {
-  if (!rolls || !rolls.length) return;
+socket.on("startRollPhaseBegan", ({ players }) => {
+  showScreen("roll");
+  playDiceRollSound(900);
 
-  let text = "Everybody rolled to see who starts:\n\n";
-  rolls.forEach((entry) => {
-    text += `${entry.playerName} rolled ${entry.roll}\n`;
+  let text = "Everyone roll to decide who goes first.\n\n";
+  (players || []).forEach((p) => {
+    text += `${p.name}\n`;
   });
 
-  showEvent("Starting Roll", text, "default", 4200);
+  setRollMessage(text.trim());
+
+  showGlobalAlert(
+    "🎲 START ROLL 🎲",
+    "Everybody rolls. Highest goes first.",
+    "money",
+    2400
+  );
 });
 
-socket.on("firstPlayerChosen", ({ playerName }) => {
-  if (!playerName) return;
+socket.on("startRollSubmitted", ({ playerId, roll }) => {
+  const playerName = currentRoom?.players?.find((p) => p.id === playerId)?.name || "Player";
+
+  showSharedDice(`${playerName} is rolling`);
+  setTimeout(() => {
+    stopSharedDice(roll, playerName);
+  }, 1200);
+
+  showEvent("Start Roll", `${playerName} rolled ${roll}.`, "default", 1600);
+});
+
+socket.on("startRollTieBreaker", ({ players }) => {
+  const names = (players || []).map((id) => {
+    const p = currentRoom?.players?.find((pl) => pl.id === id);
+    return p ? p.name : "Unknown";
+  });
+
+  setRollMessage(`Tie for highest roll.\n\n${names.join("\n")}\n\nRoll again!`);
+
+  showGlobalAlert(
+    "⚔️ TIE BREAKER ⚔️",
+    `${names.join(", ")} roll again!`,
+    "chaos",
+    2400
+  );
+
+  document.body.classList.remove("chaosFlash");
+  void document.body.offsetWidth;
+  document.body.classList.add("chaosFlash");
+  setTimeout(() => document.body.classList.remove("chaosFlash"), 500);
+});
+
+socket.on("firstPlayerChosen", ({ playerId }) => {
+  const playerName = currentRoom?.players?.find((p) => p.id === playerId)?.name || "Someone";
 
   showGlobalAlert(
     "🎯 FIRST PLAYER 🎯",
@@ -1145,16 +1273,8 @@ socket.on("firstPlayerChosen", ({ playerName }) => {
     "money",
     2600
   );
-});
 
-socket.on("gameStarted", ({ room }) => {
-  currentRoom = room;
-  currentTurnPlayerId = room.currentPlayerId || null;
-  renderRoom(room);
-  updateTurnUI();
-  showScreen("game");
-  showEvent("Game Started", "The game has begun.", "default", 3000);
-  showGlobalAlert("🎲 PLAY-DAY STARTED 🎲", "Everybody lock in. The chaos begins now.", "chaos", 2300);
+  showEvent("Game Started", `${playerName} goes first.`, "default", 2200);
 });
 
 socket.on("turnUpdate", ({ currentPlayerId, currentPlayerName }) => {
@@ -1177,26 +1297,89 @@ socket.on("turnRolled", ({ playerName, roll }) => {
   }, 1200);
 });
 
-socket.on("potBattleRolls", ({ rolls }) => {
-  if (!rolls || !rolls.length) return;
+socket.on("potUpdated", ({ pot, amountAdded, reason }) => {
+  if (bankAmount) bankAmount.textContent = formatMoney(pot ?? 0);
 
-  let text = "Everybody rolls for the pot:\n\n";
-  rolls.forEach((entry) => {
-    text += `${entry.playerName} rolled ${entry.roll}\n`;
-  });
-
-  showEvent("⚔️ POT BATTLE ⚔️", text, "deal", 4200);
+  showEvent(
+    "💰 Pot Updated",
+    `${formatMoney(amountAdded || 0)} added to the pot for ${reason || "event"}. Pot is now ${formatMoney(pot || 0)}.`,
+    "payday",
+    2600
+  );
 });
 
-socket.on("potBattleWinner", ({ playerName, amount }) => {
-  if (!playerName) return;
+socket.on("globalAlert", ({ type, text }) => {
+  if (type === "pot") {
+    showGlobalAlert("💰 POT BATTLE 💰", text || "Pot battle!", "money", 2600);
+    playPaydaySound();
+    return;
+  }
+
+  showGlobalAlert("ALERT", text || "", "chaos", 2400);
+});
+
+socket.on("potBattleStarted", ({ pot }) => {
+  showScreen("roll");
+  playDiceRollSound(1000);
+
+  setRollMessage(`💰 POT BATTLE 💰\n\nPot: ${formatMoney(pot || 0)}\n\nEveryone roll!`);
+
+  showGlobalAlert(
+    "💰 POT BATTLE 💰",
+    `Everyone rolling for ${formatMoney(pot || 0)}`,
+    "money",
+    2600
+  );
+});
+
+socket.on("potBattleRollSubmitted", ({ playerId, roll }) => {
+  const playerName = currentRoom?.players?.find((p) => p.id === playerId)?.name || "Player";
+
+  showSharedDice(`${playerName} is rolling for the pot`);
+  setTimeout(() => {
+    stopSharedDice(roll, playerName);
+  }, 1200);
+
+  showEvent(
+    "Pot Roll",
+    `${playerName} rolled ${roll}.`,
+    "deal",
+    1600
+  );
+});
+
+socket.on("potBattleTieBreaker", ({ players }) => {
+  const names = (players || []).map((id) => {
+    const p = currentRoom?.players?.find((pl) => pl.id === id);
+    return p ? p.name : "Unknown";
+  });
+
+  setRollMessage(`⚔️ POT TIE ⚔️\n\n${names.join("\n")}\n\nRoll again!`);
+
+  showGlobalAlert(
+    "⚔️ POT TIE ⚔️",
+    `${names.join(", ")} roll again!`,
+    "chaos",
+    2400
+  );
+
+  document.body.classList.remove("chaosFlash");
+  void document.body.offsetWidth;
+  document.body.classList.add("chaosFlash");
+  setTimeout(() => document.body.classList.remove("chaosFlash"), 500);
+});
+
+socket.on("potBattleWinner", ({ winnerId, amount }) => {
+  const winnerName = currentRoom?.players?.find((p) => p.id === winnerId)?.name || "Someone";
 
   showGlobalAlert(
     "💰 POT WINNER 💰",
-    `${playerName} won ${formatMoney(amount || 0)} from the pot.`,
+    `${winnerName} won ${formatMoney(amount || 0)} from the pot.`,
     "money",
     3200
   );
+
+  showScreen("game");
 });
 
 socket.on("playerMoved", ({ playerName, from, to, roll }) => {
