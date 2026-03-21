@@ -77,7 +77,7 @@ function ensureExtendedRoomState(room) {
 }
 
 function getPlayerName(room, id) {
-  const p = room.players.find(p => p.id === id);
+  const p = room.players.find((p) => p.id === id);
   return p ? p.name : "Unknown";
 }
 
@@ -111,7 +111,7 @@ function beginStartRollPhase(room) {
   room.startRollState = {
     active: true,
     round: 1,
-    eligiblePlayerIds: room.players.map(p => p.id),
+    eligiblePlayerIds: room.players.map((p) => p.id),
     rolls: {}
   };
 
@@ -120,6 +120,7 @@ function beginStartRollPhase(room) {
   });
 
   pushSystemMessage(room, "Everyone roll for turn order.");
+  emitRoomUpdate(io, room);
 }
 
 function resolveStartRollRound(room) {
@@ -127,12 +128,12 @@ function resolveStartRollRound(room) {
   const ids = room.startRollState.eligiblePlayerIds;
 
   const highest = Math.max(...Object.values(rolls));
-  const winners = ids.filter(id => rolls[id] === highest);
+  const winners = ids.filter((id) => rolls[id] === highest);
 
   if (winners.length === 1) {
     const winnerId = winners[0];
 
-    room.turnIndex = room.players.findIndex(p => p.id === winnerId);
+    room.turnIndex = room.players.findIndex((p) => p.id === winnerId);
     room.phase = "game";
     room.startRollState.active = false;
 
@@ -148,6 +149,7 @@ function resolveStartRollRound(room) {
   room.startRollState.rolls = {};
 
   io.to(room.code).emit("startRollTieBreaker", { players: winners });
+  emitRoomUpdate(io, room);
 }
 
 // ---------------------- POT BATTLE ----------------------
@@ -158,7 +160,7 @@ function startPotBattle(room) {
   room.potBattleState = {
     active: true,
     round: 1,
-    eligiblePlayerIds: room.players.map(p => p.id),
+    eligiblePlayerIds: room.players.map((p) => p.id),
     rolls: {}
   };
 
@@ -174,6 +176,7 @@ function startPotBattle(room) {
   });
 
   pushSystemMessage(room, `POT BATTLE for $${room.pot}!`);
+  emitRoomUpdate(io, room);
 }
 
 function resolvePotBattleRound(room) {
@@ -181,13 +184,13 @@ function resolvePotBattleRound(room) {
   const ids = room.potBattleState.eligiblePlayerIds;
 
   const highest = Math.max(...Object.values(rolls));
-  const winners = ids.filter(id => rolls[id] === highest);
+  const winners = ids.filter((id) => rolls[id] === highest);
 
   if (winners.length === 1) {
-    const winner = room.players.find(p => p.id === winners[0]);
+    const winner = room.players.find((p) => p.id === winners[0]);
 
     if (winner) {
-      winner.money += room.pot;
+      winner.cash += room.pot;
     }
 
     io.to(room.code).emit("potBattleWinner", {
@@ -211,6 +214,8 @@ function resolvePotBattleRound(room) {
   io.to(room.code).emit("potBattleTieBreaker", {
     players: winners
   });
+
+  emitRoomUpdate(io, room);
 }
 
 function maybeTriggerPotBattle(room) {
@@ -221,13 +226,13 @@ function maybeTriggerPotBattle(room) {
     startPotBattle(room);
   } else {
     room.turnsSinceLastPotBattle++;
+    emitRoomUpdate(io, room);
   }
 }
 
 // ---------------------- SOCKET ----------------------
 
 io.on("connection", (socket) => {
-
   socket.on("createRoom", ({ name, avatar }) => {
     const code = generateRoomCode(rooms);
     const room = createRoom(code, socket.id);
@@ -252,6 +257,8 @@ io.on("connection", (socket) => {
     const room = rooms[roomCode];
     if (!room) return;
 
+    ensureExtendedRoomState(room);
+
     const player = createPlayer(socket.id, name, normalizeAvatar(avatar));
     room.players.push(player);
 
@@ -269,12 +276,19 @@ io.on("connection", (socket) => {
     const room = getRoomBySocketId(rooms, socket.id);
     if (!room) return;
 
+    ensureExtendedRoomState(room);
     beginStartRollPhase(room);
   });
 
   socket.on("rollForStart", () => {
     const room = getRoomBySocketId(rooms, socket.id);
     if (!room) return;
+
+    ensureExtendedRoomState(room);
+
+    if (room.phase !== "start-roll" || !room.startRollState.active) return;
+    if (!room.startRollState.eligiblePlayerIds.includes(socket.id)) return;
+    if (typeof room.startRollState.rolls[socket.id] === "number") return;
 
     const roll = Math.floor(Math.random() * 6) + 1;
     room.startRollState.rolls[socket.id] = roll;
@@ -284,6 +298,8 @@ io.on("connection", (socket) => {
       roll
     });
 
+    emitRoomUpdate(io, room);
+
     if (Object.keys(room.startRollState.rolls).length === room.startRollState.eligiblePlayerIds.length) {
       resolveStartRollRound(room);
     }
@@ -292,6 +308,8 @@ io.on("connection", (socket) => {
   socket.on("rollTurn", () => {
     const room = getRoomBySocketId(rooms, socket.id);
     if (!room) return;
+
+    ensureExtendedRoomState(room);
 
     const player = getCurrentPlayer(room);
     if (!player || player.id !== socket.id) return;
@@ -307,6 +325,12 @@ io.on("connection", (socket) => {
     const room = getRoomBySocketId(rooms, socket.id);
     if (!room) return;
 
+    ensureExtendedRoomState(room);
+
+    if (room.phase !== "pot-battle" || !room.potBattleState.active) return;
+    if (!room.potBattleState.eligiblePlayerIds.includes(socket.id)) return;
+    if (typeof room.potBattleState.rolls[socket.id] === "number") return;
+
     const roll = Math.floor(Math.random() * 6) + 1;
     room.potBattleState.rolls[socket.id] = roll;
 
@@ -314,6 +338,8 @@ io.on("connection", (socket) => {
       playerId: socket.id,
       roll
     });
+
+    emitRoomUpdate(io, room);
 
     if (Object.keys(room.potBattleState.rolls).length === room.potBattleState.eligiblePlayerIds.length) {
       resolvePotBattleRound(room);
@@ -324,13 +350,14 @@ io.on("connection", (socket) => {
     const room = getRoomBySocketId(rooms, socket.id);
     if (!room) return;
 
+    ensureExtendedRoomState(room);
+
     const allowed = ["charity", "top golf", "fundraiser", "donation", "event"];
 
     if (!allowed.includes((reason || "").toLowerCase())) return;
 
     addToPot(room, amount, reason);
   });
-
 });
 
 // ----------------------
