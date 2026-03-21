@@ -74,6 +74,10 @@ function ensureExtendedRoomState(room) {
       rolls: {}
     };
   }
+
+  if (!Array.isArray(room.chat)) {
+    room.chat = [];
+  }
 }
 
 function getPlayerName(room, id) {
@@ -357,6 +361,27 @@ io.on("connection", (socket) => {
     if (!allowed.includes((reason || "").toLowerCase())) return;
 
     addToPot(room, amount, reason);
+  });
+
+  socket.on("sendChatMessage", ({ text }) => {
+    const room = getRoomBySocketId(rooms, socket.id);
+    if (!room) return;
+
+    ensureExtendedRoomState(room);
+
+    const player = getPlayerBySocketId(room, socket.id);
+    if (!player) return;
+
+    const trimmedText = String(text || "").trim().slice(0, 180);
+    if (!trimmedText) return;
+
+    room.chat.push({
+      system: false,
+      name: player.name,
+      text: trimmedText
+    });
+
+    emitRoomUpdate(io, room);
   });
 });
 
