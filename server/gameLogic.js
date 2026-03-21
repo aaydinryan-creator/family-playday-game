@@ -4,6 +4,21 @@ function formatMoney(amount) {
   return `$${Number(amount || 0).toLocaleString()}`;
 }
 
+function safeNumber(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
+function clampRoomBank(room, fallback = 50000) {
+  if (!room || !Number.isFinite(room.bank)) {
+    if (room) room.bank = fallback;
+    return;
+  }
+
+  if (room.bank < 0) {
+    room.bank = 0;
+  }
+}
+
 function getTileAtPosition(position) {
   if (position < 0 || position >= board.length) return null;
   return board[position];
@@ -43,19 +58,21 @@ function removeInventoryItemById(player, itemId) {
 }
 
 function addMoney(player, room, amount) {
-  const value = Number(amount || 0);
+  const value = safeNumber(amount);
   player.cash += value;
   room.bank -= value;
+  clampRoomBank(room);
 }
 
 function removeMoney(player, room, amount) {
-  const value = Number(amount || 0);
+  const value = safeNumber(amount);
   player.cash -= value;
   room.bank += value;
+  clampRoomBank(room);
 }
 
 function transferMoney(fromPlayer, toPlayer, amount) {
-  const value = Number(amount || 0);
+  const value = safeNumber(amount);
   fromPlayer.cash -= value;
   toPlayer.cash += value;
 }

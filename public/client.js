@@ -541,7 +541,8 @@ function renderRoom(room) {
     room.phase === "game" ||
     room.phase === "rolling" ||
     room.phase === "moving" ||
-    room.phase === "resolving"
+    room.phase === "resolving" ||
+    room.phase === "battle"
   ) {
     showScreen("game");
   }
@@ -1124,6 +1125,28 @@ socket.on("roomUpdated", (room) => {
   updateTurnUI();
 });
 
+socket.on("startRolls", ({ rolls }) => {
+  if (!rolls || !rolls.length) return;
+
+  let text = "Everybody rolled to see who starts:\n\n";
+  rolls.forEach((entry) => {
+    text += `${entry.playerName} rolled ${entry.roll}\n`;
+  });
+
+  showEvent("Starting Roll", text, "default", 4200);
+});
+
+socket.on("firstPlayerChosen", ({ playerName }) => {
+  if (!playerName) return;
+
+  showGlobalAlert(
+    "🎯 FIRST PLAYER 🎯",
+    `${playerName} goes first.`,
+    "money",
+    2600
+  );
+});
+
 socket.on("gameStarted", ({ room }) => {
   currentRoom = room;
   currentTurnPlayerId = room.currentPlayerId || null;
@@ -1154,6 +1177,28 @@ socket.on("turnRolled", ({ playerName, roll }) => {
   }, 1200);
 });
 
+socket.on("potBattleRolls", ({ rolls }) => {
+  if (!rolls || !rolls.length) return;
+
+  let text = "Everybody rolls for the pot:\n\n";
+  rolls.forEach((entry) => {
+    text += `${entry.playerName} rolled ${entry.roll}\n`;
+  });
+
+  showEvent("⚔️ POT BATTLE ⚔️", text, "deal", 4200);
+});
+
+socket.on("potBattleWinner", ({ playerName, amount }) => {
+  if (!playerName) return;
+
+  showGlobalAlert(
+    "💰 POT WINNER 💰",
+    `${playerName} won ${formatMoney(amount || 0)} from the pot.`,
+    "money",
+    3200
+  );
+});
+
 socket.on("playerMoved", ({ playerName, from, to, roll }) => {
   console.log(`${playerName} moved from ${from} to ${to} with a roll of ${roll}.`);
 });
@@ -1170,8 +1215,6 @@ socket.on("playdayPassed", async ({ playerName, amount, room }) => {
   await showPlaydaySequence(playerName, amount);
 });
 
-// NON-BLOCKING FIX APPLIED HERE:
-// removed `async` from the listener and removed `await` before showCardSequence
 socket.on("tileResult", ({ title, message, room, eventType, landedPosition, cards, playerName, cashDelta }) => {
   currentRoom = room;
   currentTurnPlayerId = room.currentPlayerId || null;

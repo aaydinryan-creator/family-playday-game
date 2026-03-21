@@ -17,60 +17,6 @@ function safelyClampRoomBank(room, fallback = 50000) {
   }
 }
 
-// ============================
-// 🔥 NEW: POT BATTLE SYSTEM
-// ============================
-function runPotBattle(io, room, emitRoomUpdate, pushSystemMessage) {
-  if (!room.players.length) return;
-
-  room.phase = "battle";
-
-  const rolls = room.players.map(p => ({
-    player: p,
-    roll: Math.floor(Math.random() * 6) + 1
-  }));
-
-  const highest = Math.max(...rolls.map(r => r.roll));
-  const winners = rolls.filter(r => r.roll === highest);
-
-  io.to(room.code).emit("potBattleRolls", {
-    rolls: rolls.map(r => ({
-      playerName: r.player.name,
-      roll: r.roll
-    }))
-  });
-
-  setTimeout(() => {
-    if (winners.length > 1) {
-      pushSystemMessage(room, `Tie for pot battle! Rolling again...`);
-      runPotBattle(io, room, emitRoomUpdate, pushSystemMessage);
-      return;
-    }
-
-    const winner = winners[0].player;
-    const pot = room.bank;
-
-    winner.cash += pot;
-    room.bank = 0;
-
-    pushSystemMessage(room, `${winner.name} WON THE POT and collected ${formatMoney(pot)} 💰`);
-
-    io.to(room.code).emit("potBattleWinner", {
-      playerName: winner.name,
-      amount: pot
-    });
-
-    emitRoomUpdate(io, room);
-
-    setTimeout(() => {
-      beginNextTurn(io, room, emitRoomUpdate);
-    }, 2500);
-  }, 2000);
-}
-
-// ============================
-// EXISTING (UNCHANGED)
-// ============================
 function getSafePlayer(player) {
   return {
     id: player.id,
@@ -132,13 +78,72 @@ function beginNextTurn(io, room, emitRoomUpdate) {
 }
 
 // ============================
-// 🔥 MODIFIED ROLL (ADDED POT CHANCE)
+// POT BATTLE SYSTEM
 // ============================
+function runPotBattle(io, room, emitRoomUpdate, pushSystemMessage) {
+  if (!room || !room.players.length) return;
+
+  const eligiblePlayers = room.players.filter((player) => player.connected !== false);
+  if (!eligiblePlayers.length) {
+    beginNextTurn(io, room, emitRoomUpdate);
+    return;
+  }
+
+  room.phase = "battle";
+  emitRoomUpdate(io, room);
+
+  const rolls = eligiblePlayers.map((player) => ({
+    player,
+    roll: Math.floor(Math.random() * 6) + 1
+  }));
+
+  const highest = Math.max(...rolls.map((r) => r.roll));
+  const winners = rolls.filter((r) => r.roll === highest);
+
+  io.to(room.code).emit("potBattleRolls", {
+    rolls: rolls.map((r) => ({
+      playerName: r.player.name,
+      roll: r.roll
+    }))
+  });
+
+  setTimeout(() => {
+    if (winners.length > 1) {
+      pushSystemMessage(room, `Tie for pot battle at ${highest}. Rolling again...`);
+      runPotBattle(io, room, emitRoomUpdate, pushSystemMessage);
+      return;
+    }
+
+    const winner = winners[0].player;
+    const pot = Number(room.bank || 0);
+
+    winner.cash += pot;
+    room.bank = 0;
+    safelyClampRoomBank(room, 0);
+
+    pushSystemMessage(room, `${winner.name} WON THE POT and collected ${formatMoney(pot)}.`);
+
+    io.to(room.code).emit("potBattleWinner", {
+      playerName: winner.name,
+      amount: pot,
+      room: getSafeRoomSnapshot(room)
+    });
+
+    emitRoomUpdate(io, room);
+
+    setTimeout(() => {
+      beginNextTurn(io, room, emitRoomUpdate);
+    }, 2500);
+  }, 2000);
+}
+
 function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   if (!room || !player) return;
 
   const currentPlayer = getCurrentPlayer(room);
-  if (!currentPlayer || currentPlayer.id !== player.id) return;
+  if (!currentPlayer || currentPlayer.id !== player.id) {
+    return;
+  }
 
   room.phase = "rolling";
   emitRoomUpdate(io, room);
@@ -169,6 +174,13 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
         room,
         `${player.name} hit PLAYDAY and collected ${formatMoney(PLAYDAY_AMOUNT)}.`
       );
+
+      io.to(room.code).emit("playdayPassed", {
+        playerId: player.id,
+        playerName: player.name,
+        amount: PLAYDAY_AMOUNT,
+        room: getSafeRoomSnapshot(room)
+      });
     }
 
     io.to(room.code).emit("playerMoved", {
@@ -182,17 +194,30 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
     emitRoomUpdate(io, room);
 
     setTimeout(() => {
-      // 🔥 RANDOM POT BATTLE (20% chance)
+      // 20% chance to trigger pot battle before tile resolution
       if (Math.random() < 0.2) {
-        pushSystemMessage(room, `⚔️ POT BATTLE TRIGGERED! Everyone rolls for the bank!`);
+        pushSystemMessage(room, "⚔️ POT BATTLE TRIGGERED! Everyone rolls for the bank!");
         runPotBattle(io, room, emitRoomUpdate, pushSystemMessage);
         return;
       }
 
       room.phase = "resolving";
 
-      const result = handleTile(room, player, roll);
+      const beforeCash = Number(player.cash || 0);
 
+      const result = handleTile(room, player, roll) || {
+        title: "Tile",
+        message: `${player.name} landed somewhere.`,
+        tile: null,
+        cards: [],
+        revealDuration: 3500,
+        soundCue: "tile_land"
+      };
+
+      const afterCash = Number(player.cash || 0);
+      const delta = afterCash - beforeCash;
+
+      safelyClampRoomBank(room);
       pushSystemMessage(room, result.message);
 
       io.to(room.code).emit("tileResult", {
@@ -204,6 +229,7 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
         cards: result.cards || [],
         revealDuration: result.revealDuration || 3500,
         soundCue: result.soundCue || null,
+        cashDelta: delta,
         room: getSafeRoomSnapshot(room)
       });
 
