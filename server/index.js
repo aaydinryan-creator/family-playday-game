@@ -320,7 +320,7 @@ io.on("connection", (socket) => {
     const currentPlayer = getCurrentPlayer(room);
     if (!currentPlayer) return;
 
-    if (currentPlayer.id !== socket.id) {
+    if (!currentPlayer || currentPlayer.id !== socket.id) {
       socket.emit("errorMessage", "It is not your turn.");
       return;
     }

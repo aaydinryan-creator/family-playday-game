@@ -25,14 +25,8 @@ function getSafePlayer(player) {
     cash: player.cash,
     avatar: player.avatar,
     connected: player.connected !== false,
-    deals: Array.isArray(player.deals) ? player.deals : [],
-    hand: Array.isArray(player.hand) ? player.hand : [],
     inventory: {
       items: Array.isArray(player.inventory?.items) ? player.inventory.items : []
-    },
-    stats: {
-      totalEarned: Number(player.stats?.totalEarned || 0),
-      totalLost: Number(player.stats?.totalLost || 0)
     }
   };
 }
@@ -60,15 +54,39 @@ function sendTurnUpdate(io, room) {
   });
 }
 
+function skipOfflinePlayers(room) {
+  let safety = 0;
+
+  while (
+    room.players.length &&
+    getCurrentPlayer(room)?.connected === false &&
+    safety < 20
+  ) {
+    nextTurn(room);
+    safety++;
+  }
+}
+
 function beginNextTurn(io, room, emitRoomUpdate) {
-  room.phase = "game";
   nextTurn(room);
+
+  // 🔥 FIX: skip disconnected players
+  skipOfflinePlayers(room);
+
+  room.phase = "game";
+
   sendTurnUpdate(io, room);
   emitRoomUpdate(io, room);
 }
 
 function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   if (!room || !player) return;
+
+  // 🔥 HARD CHECK
+  const currentPlayer = getCurrentPlayer(room);
+  if (!currentPlayer || currentPlayer.id !== player.id) {
+    return;
+  }
 
   room.phase = "rolling";
   emitRoomUpdate(io, room);
@@ -77,11 +95,7 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   const from = player.position;
   const rawTo = from + roll;
 
-  // IMPORTANT FIX:
-  // Do not give the extra wrap-around PLAYDAY bonus if the player is already
-  // standing on the final payday tile and rolling off it.
   const passedPlayday = rawTo >= board.length && from !== board.length - 1;
-
   const to = rawTo % board.length;
 
   io.to(room.code).emit("turnRolled", {
@@ -98,10 +112,6 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
       player.cash += PLAYDAY_AMOUNT;
       room.bank -= PLAYDAY_AMOUNT;
       safelyClampRoomBank(room);
-
-      if (player.stats) {
-        player.stats.totalEarned = Number(player.stats.totalEarned || 0) + PLAYDAY_AMOUNT;
-      }
 
       pushSystemMessage(
         room,
@@ -133,7 +143,7 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
 
       const result = handleTile(room, player, roll) || {
         title: "Tile",
-        message: `${player.name} landed on a tile.`,
+        message: `${player.name} landed somewhere.`,
         tile: null,
         cards: [],
         revealDuration: 3500,
@@ -142,14 +152,6 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
 
       const afterCash = Number(player.cash || 0);
       const delta = afterCash - beforeCash;
-
-      if (player.stats) {
-        if (delta > 0) {
-          player.stats.totalEarned = Number(player.stats.totalEarned || 0) + delta;
-        } else if (delta < 0) {
-          player.stats.totalLost = Number(player.stats.totalLost || 0) + Math.abs(delta);
-        }
-      }
 
       safelyClampRoomBank(room);
       pushSystemMessage(room, result.message);

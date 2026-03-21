@@ -1,4 +1,6 @@
-const socket = io("https://family-playday-game.onrender.com");
+const socket = window.location.hostname === "localhost"
+  ? io()
+  : io("https://family-playday-game.onrender.com");
 
 let currentRoom = null;
 let myId = null;
@@ -512,6 +514,7 @@ function renderRoom(room) {
   if (!room) return;
 
   currentRoom = room;
+  currentTurnPlayerId = room.currentPlayerId || null;
 
   if (roomCodeDisplay) roomCodeDisplay.textContent = room.code || "----";
   if (rollRoomCodeDisplay) rollRoomCodeDisplay.textContent = room.code || "----";
@@ -1110,18 +1113,22 @@ roomCodeInput?.addEventListener("input", () => {
 socket.on("roomJoined", ({ room, yourId }) => {
   myId = yourId;
   renderRoom(room);
+  updateTurnUI();
   showScreen(room.phase === "lobby" ? "lobby" : "game");
 });
 
 socket.on("roomUpdated", (room) => {
   currentRoom = room;
+  currentTurnPlayerId = room.currentPlayerId || null;
   renderRoom(room);
   updateTurnUI();
 });
 
 socket.on("gameStarted", ({ room }) => {
   currentRoom = room;
+  currentTurnPlayerId = room.currentPlayerId || null;
   renderRoom(room);
+  updateTurnUI();
   showScreen("game");
   showEvent("Game Started", "The game has begun.", "default", 3000);
   showGlobalAlert("🎲 PLAY-DAY STARTED 🎲", "Everybody lock in. The chaos begins now.", "chaos", 2300);
@@ -1131,7 +1138,10 @@ socket.on("turnUpdate", ({ currentPlayerId, currentPlayerName }) => {
   currentTurnPlayerId = currentPlayerId;
   sharedTurnRollAnimating = false;
   updateTurnUI();
-  showEvent("Next Turn", `${currentPlayerName}'s turn.`, "default", 2200);
+
+  if (currentPlayerName) {
+    showEvent("Next Turn", `${currentPlayerName}'s turn.`, "default", 2200);
+  }
 });
 
 socket.on("turnRolled", ({ playerName, roll }) => {
@@ -1150,6 +1160,7 @@ socket.on("playerMoved", ({ playerName, from, to, roll }) => {
 
 socket.on("playdayPassed", async ({ playerName, amount, room }) => {
   currentRoom = room;
+  currentTurnPlayerId = room.currentPlayerId || null;
   renderRoom(room);
   updateTurnUI();
 
@@ -1161,6 +1172,7 @@ socket.on("playdayPassed", async ({ playerName, amount, room }) => {
 
 socket.on("tileResult", async ({ title, message, room, eventType, landedPosition, cards, playerName, cashDelta }) => {
   currentRoom = room;
+  currentTurnPlayerId = room.currentPlayerId || null;
   renderRoom(room);
   updateTurnUI();
 
