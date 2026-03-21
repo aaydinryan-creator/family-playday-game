@@ -10,6 +10,7 @@ let sharedRollingInterval = null;
 let sharedTurnRollAnimating = false;
 let globalAlertTimeout = null;
 let allowPageExit = false;
+let reconnectId = localStorage.getItem("playday_reconnect") || null;
 
 const CARD_READ_TIME = 9000;
 const GLOBAL_ALERT_TIME = 2400;
@@ -1128,7 +1129,8 @@ createRoomBtn?.addEventListener("click", () => {
 
   socket.emit("createRoom", {
     name: nameInput?.value || "",
-    avatar: getSelectedAvatar()
+    avatar: getSelectedAvatar(),
+    reconnectId
   });
 });
 
@@ -1139,7 +1141,8 @@ joinRoomBtn?.addEventListener("click", () => {
   socket.emit("joinRoom", {
     name: nameInput?.value || "",
     roomCode: roomCodeInput?.value || "",
-    avatar: getSelectedAvatar()
+    avatar: getSelectedAvatar(),
+    reconnectId
   });
 });
 
@@ -1200,8 +1203,14 @@ roomCodeInput?.addEventListener("input", () => {
   roomCodeInput.value = roomCodeInput.value.toUpperCase();
 });
 
-socket.on("roomJoined", ({ room, yourId }) => {
+socket.on("roomJoined", ({ room, yourId, reconnectId: serverReconnectId }) => {
   myId = yourId;
+
+  if (serverReconnectId) {
+    reconnectId = serverReconnectId;
+    localStorage.setItem("playday_reconnect", reconnectId);
+  }
+
   renderRoom(room);
   updateTurnUI();
 });

@@ -90,6 +90,33 @@ function shouldTriggerPotBattle(room) {
   return Math.random() < POT_BATTLE_CHANCE;
 }
 
+function findPlayerByReconnectId(room, reconnectId) {
+  if (!room || !reconnectId) return null;
+  return room.players.find((p) => p.reconnectId === reconnectId) || null;
+}
+
+function cleanupDisconnectedPlayers() {
+  const now = Date.now();
+
+  Object.values(rooms).forEach((room) => {
+    if (!room || !Array.isArray(room.players)) return;
+
+    room.players = room.players.filter((player) => {
+      if (player.connected !== false) return true;
+      if (!player.lastSeenAt) return true;
+      return now - player.lastSeenAt < RECONNECT_GRACE_MS;
+    });
+
+    ensureValidTurnIndex(room);
+
+    if (room.players.length === 0) {
+      delete rooms[room.code];
+    }
+  });
+}
+
+setInterval(cleanupDisconnectedPlayers, 10000);
+
 // ---------------------- POT ----------------------
 
 function addToPot(room, amount, reason) {
@@ -115,7 +142,9 @@ function beginStartRollPhase(room) {
   room.startRollState = {
     active: true,
     round: 1,
-    eligiblePlayerIds: room.players.map((p) => p.id),
+    eligiblePlayerIds: room.players
+      .filter((p) => p.connected !== false)
+      .map((p) => p.id),
     rolls: {}
   };
 
@@ -164,7 +193,9 @@ function startPotBattle(room) {
   room.potBattleState = {
     active: true,
     round: 1,
-    eligiblePlayerIds: room.players.map((p) => p.id),
+    eligiblePlayerIds: room.players
+      .filter((p) => p.connected !== false)
+      .map((p) => p.id),
     rolls: {}
   };
 
@@ -237,13 +268,17 @@ function maybeTriggerPotBattle(room) {
 // ---------------------- SOCKET ----------------------
 
 io.on("connection", (socket) => {
-  socket.on("createRoom", ({ name, avatar }) => {
+  socket.on("createRoom", ({ name, avatar, reconnectId }) => {
     const code = generateRoomCode(rooms);
     const room = createRoom(code, socket.id);
 
     ensureExtendedRoomState(room);
 
     const player = createPlayer(socket.id, name, normalizeAvatar(avatar));
+    player.reconnectId = reconnectId || socket.id;
+    player.connected = true;
+    player.lastSeenAt = Date.now();
+
     room.players.push(player);
 
     rooms[code] = room;
@@ -251,26 +286,58 @@ io.on("connection", (socket) => {
 
     socket.emit("roomJoined", {
       room: getSafeRoom(room),
-      yourId: socket.id
+      yourId: socket.id,
+      reconnectId: player.reconnectId
     });
 
     emitRoomUpdate(io, room);
   });
 
-  socket.on("joinRoom", ({ name, roomCode, avatar }) => {
-    const room = rooms[roomCode];
+  socket.on("joinRoom", ({ name, roomCode, avatar, reconnectId }) => {
+    const code = String(roomCode || "").trim().toUpperCase();
+    const room = rooms[code];
     if (!room) return;
 
     ensureExtendedRoomState(room);
 
+    const existingPlayer = findPlayerByReconnectId(room, reconnectId);
+
+    if (existingPlayer) {
+      existingPlayer.id = socket.id;
+      existingPlayer.name = name || existingPlayer.name;
+      existingPlayer.avatar = normalizeAvatar(avatar || existingPlayer.avatar);
+      existingPlayer.connected = true;
+      existingPlayer.lastSeenAt = Date.now();
+
+      socket.join(room.code);
+
+      socket.emit("roomJoined", {
+        room: getSafeRoom(room),
+        yourId: socket.id,
+        reconnectId: existingPlayer.reconnectId
+      });
+
+      pushSystemMessage(room, `${existingPlayer.name} reconnected.`);
+      emitRoomUpdate(io, room);
+      return;
+    }
+
+    if (room.phase !== "lobby") return;
+    if (room.players.length >= MAX_PLAYERS) return;
+
     const player = createPlayer(socket.id, name, normalizeAvatar(avatar));
+    player.reconnectId = reconnectId || socket.id;
+    player.connected = true;
+    player.lastSeenAt = Date.now();
+
     room.players.push(player);
 
     socket.join(room.code);
 
     socket.emit("roomJoined", {
       room: getSafeRoom(room),
-      yourId: socket.id
+      yourId: socket.id,
+      reconnectId: player.reconnectId
     });
 
     emitRoomUpdate(io, room);
@@ -381,6 +448,22 @@ io.on("connection", (socket) => {
       text: trimmedText
     });
 
+    emitRoomUpdate(io, room);
+  });
+
+  socket.on("disconnect", () => {
+    const room = getRoomBySocketId(rooms, socket.id);
+    if (!room) return;
+
+    ensureExtendedRoomState(room);
+
+    const player = getPlayerBySocketId(room, socket.id);
+    if (!player) return;
+
+    player.connected = false;
+    player.lastSeenAt = Date.now();
+
+    pushSystemMessage(room, `${player.name} disconnected. Waiting for reconnect...`);
     emitRoomUpdate(io, room);
   });
 });
