@@ -1170,7 +1170,9 @@ socket.on("playdayPassed", async ({ playerName, amount, room }) => {
   await showPlaydaySequence(playerName, amount);
 });
 
-socket.on("tileResult", async ({ title, message, room, eventType, landedPosition, cards, playerName, cashDelta }) => {
+// NON-BLOCKING FIX APPLIED HERE:
+// removed `async` from the listener and removed `await` before showCardSequence
+socket.on("tileResult", ({ title, message, room, eventType, landedPosition, cards, playerName, cashDelta }) => {
   currentRoom = room;
   currentTurnPlayerId = room.currentPlayerId || null;
   renderRoom(room);
@@ -1198,7 +1200,7 @@ socket.on("tileResult", async ({ title, message, room, eventType, landedPosition
   }
 
   if (cards && cards.length) {
-    await showCardSequence(safePlayerName, cards);
+    showCardSequence(safePlayerName, cards);
   } else {
     maybeShowTilePopup(eventType, title, message, safePlayerName);
   }

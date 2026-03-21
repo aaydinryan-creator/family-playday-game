@@ -1009,10 +1009,12 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 18px;
-  background: rgba(7, 10, 16, 0.72);
-  backdrop-filter: blur(4px);
+ background: rgba(7, 10, 16, 0.35); /* lighter */
+backdrop-filter: none; /* optional */
   -webkit-backdrop-filter: blur(4px);
   padding: 16px;
+
+  pointer-events: none; /* 🔥 THIS IS THE FIX */
 }
 
 .revealHud {
@@ -1260,8 +1262,10 @@ button:disabled {
   background:
     radial-gradient(circle at center, rgba(255, 221, 87, 0.22), rgba(0, 0, 0, 0.72)),
     rgba(7, 10, 16, 0.72);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;

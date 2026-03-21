@@ -56,6 +56,53 @@ function normalizeAvatar(avatar) {
   return { emoji, hat, color };
 }
 
+// 🔥 NEW: highest roller starts first
+function startGameWithRoll(room) {
+  if (!room || !Array.isArray(room.players) || room.players.length < 2) return;
+
+  const rolls = room.players.map((player) => ({
+    player,
+    roll: Math.floor(Math.random() * 6) + 1
+  }));
+
+  const highest = Math.max(...rolls.map((r) => r.roll));
+  const winners = rolls.filter((r) => r.roll === highest);
+
+  io.to(room.code).emit("startRolls", {
+    rolls: rolls.map((r) => ({
+      playerName: r.player.name,
+      roll: r.roll
+    }))
+  });
+
+  if (winners.length > 1) {
+    pushSystemMessage(room, `Tie on the starting roll at ${highest}. Rolling again...`);
+    emitRoomUpdate(io, room);
+
+    setTimeout(() => {
+      startGameWithRoll(room);
+    }, 1500);
+    return;
+  }
+
+  const starter = winners[0].player;
+  room.turnIndex = room.players.findIndex((p) => p.id === starter.id);
+  ensureValidTurnIndex(room);
+  room.phase = "game";
+
+  pushSystemMessage(room, `${starter.name} rolled highest and goes first.`);
+  io.to(room.code).emit("firstPlayerChosen", {
+    playerName: starter.name
+  });
+
+  io.to(room.code).emit("gameStarted", {
+    room: getSafeRoom(room)
+  });
+
+  sendTurnUpdate(io, room);
+  emitRoomUpdate(io, room);
+}
+
 function findRoomByReconnectId(reconnectId) {
   if (!reconnectId) return null;
 
@@ -295,17 +342,10 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.phase = "game";
-    room.turnIndex = 0;
-
-    pushSystemMessage(room, "The game has started.");
-
-    io.to(room.code).emit("gameStarted", {
-      room: getSafeRoom(room)
-    });
-
-    sendTurnUpdate(io, room);
+    pushSystemMessage(room, "Rolling to decide who goes first...");
     emitRoomUpdate(io, room);
+
+    startGameWithRoll(room);
   });
 
   socket.on("rollTurn", () => {
