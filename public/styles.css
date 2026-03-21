@@ -1812,3 +1812,178 @@ button:disabled {
     animation: none !important;
   }
 }
+
+/* ===== MOBILE BOARD FIX OVERRIDES ===== */
+
+@media (max-width: 640px) {
+  #gameScreen {
+    padding: 8px;
+    padding-left: max(8px, var(--safe-left));
+    padding-right: max(8px, var(--safe-right));
+    padding-bottom: max(8px, var(--safe-bottom));
+  }
+
+  .gameShell {
+    gap: 10px;
+  }
+
+  .gameHud {
+    gap: 8px;
+  }
+
+  .hudPill,
+  .hudMusicBtn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 14px;
+  }
+
+  #boardOuterScroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-inline: -8px;
+    padding-inline: 8px;
+    padding-bottom: 8px;
+    scroll-padding-inline: 8px;
+  }
+
+  #boardWrap {
+    min-width: 0;
+    width: max-content;
+    padding: 10px;
+    border-radius: 18px;
+  }
+
+  #gameBoard {
+    padding: 10px;
+    border-width: 4px;
+    border-radius: 18px;
+  }
+
+  .boardTitle {
+    font-size: clamp(26px, 8vw, 36px);
+    margin-bottom: 4px;
+  }
+
+  .calendarHint {
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+
+  .boardGrid {
+    grid-template-columns: repeat(8, 46px);
+    gap: 6px;
+  }
+
+  .tile {
+    min-height: 78px;
+    border-radius: 14px;
+    padding: 8px 4px 6px;
+    border-width: 2px;
+  }
+
+  .tileNum {
+    top: 4px;
+    left: 4px;
+    min-width: 20px;
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .tileLabel {
+    font-size: 10px;
+    line-height: 1.05;
+    margin-top: 10px;
+    max-width: 96%;
+  }
+
+  .tilePieces {
+    bottom: 4px;
+    left: 4px;
+    right: 4px;
+    gap: 3px;
+    min-height: 22px;
+  }
+
+  .boardAvatar {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+  }
+
+  .boardAvatar .avatarEmoji {
+    font-size: 11px;
+  }
+
+  .boardAvatar .avatarHat {
+    top: -7px;
+    font-size: 9px;
+  }
+
+  .mobileStickyBar {
+    bottom: calc(8px + var(--safe-bottom));
+    padding: 6px;
+    border-radius: 14px;
+  }
+
+  .sideCard,
+  .cardSection {
+    padding: 12px;
+  }
+
+  .gameChat {
+    min-height: 180px;
+    max-height: 260px;
+  }
+}
+
+@media (max-width: 420px) {
+  #boardOuterScroll {
+    margin-inline: -6px;
+    padding-inline: 6px;
+  }
+
+  #boardWrap {
+    padding: 8px;
+  }
+
+  #gameBoard {
+    padding: 8px;
+  }
+
+  .boardGrid {
+    grid-template-columns: repeat(8, 42px);
+    gap: 5px;
+  }
+
+  .tile {
+    min-height: 72px;
+    padding: 7px 3px 5px;
+  }
+
+  .tileLabel {
+    font-size: 9px;
+    margin-top: 9px;
+  }
+
+  .tileNum {
+    font-size: 9px;
+    min-width: 18px;
+    padding: 2px 5px;
+  }
+
+  .boardAvatar {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+  }
+
+  .boardAvatar .avatarEmoji {
+    font-size: 10px;
+  }
+
+  .boardAvatar .avatarHat {
+    top: -6px;
+    font-size: 8px;
+  }
+}
