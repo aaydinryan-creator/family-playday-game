@@ -178,18 +178,20 @@ function resolveStartRollRound(room) {
 // ---------------------- POT BATTLE ----------------------
 
 function startPotBattle(room) {
+  if (!room) return;
   if (room.phase !== "game") return;
   if (room.potBattleState?.active) return;
   if (room.pot < POT_BATTLE_TRIGGER_AMOUNT) return;
+
+  const eligiblePlayers = room.players.filter((p) => p.connected !== false);
+  if (eligiblePlayers.length < 2) return;
 
   room.phase = "pot-battle";
 
   room.potBattleState = {
     active: true,
     round: 1,
-    eligiblePlayerIds: room.players
-      .filter((p) => p.connected !== false)
-      .map((p) => p.id),
+    eligiblePlayerIds: eligiblePlayers.map((p) => p.id),
     rolls: {}
   };
 
@@ -371,7 +373,10 @@ io.on("connection", (socket) => {
 
     emitRoomUpdate(io, room);
 
-    if (Object.keys(room.startRollState.rolls).length === room.startRollState.eligiblePlayerIds.length) {
+    if (
+      Object.keys(room.startRollState.rolls).length ===
+      room.startRollState.eligiblePlayerIds.length
+    ) {
       resolveStartRollRound(room);
     }
   });
@@ -384,6 +389,7 @@ io.on("connection", (socket) => {
 
     const player = getCurrentPlayer(room);
     if (!player || player.id !== socket.id) return;
+    if (room.phase !== "game") return;
 
     handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage);
 
@@ -412,7 +418,10 @@ io.on("connection", (socket) => {
 
     emitRoomUpdate(io, room);
 
-    if (Object.keys(room.potBattleState.rolls).length === room.potBattleState.eligiblePlayerIds.length) {
+    if (
+      Object.keys(room.potBattleState.rolls).length ===
+      room.potBattleState.eligiblePlayerIds.length
+    ) {
       resolvePotBattleRound(room);
     }
   });
@@ -424,15 +433,13 @@ io.on("connection", (socket) => {
     ensureExtendedRoomState(room);
 
     const allowed = ["charity", "top golf", "fundraiser", "donation", "event"];
-
     if (!allowed.includes((reason || "").toLowerCase())) return;
 
     addToPot(room, amount, reason);
 
+    // INSTANT trigger the second the pot reaches 3000+
     if (room.phase === "game" && room.pot >= POT_BATTLE_TRIGGER_AMOUNT) {
-      setTimeout(() => {
-        maybeTriggerPotBattle(room);
-      }, 200);
+      startPotBattle(room);
     }
   });
 
@@ -470,6 +477,11 @@ io.on("connection", (socket) => {
     player.lastSeenAt = Date.now();
 
     pushSystemMessage(room, `${player.name} disconnected. Waiting for reconnect...`);
+
+    if (room.hostId === socket.id) {
+      transferHostIfNeeded(room);
+    }
+
     emitRoomUpdate(io, room);
   });
 });

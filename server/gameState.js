@@ -4,8 +4,9 @@ function createRoom(code, hostId) {
   return {
     code,
     hostId,
-    phase: "lobby", // lobby → game → rolling → moving → resolving
+    phase: "lobby", // lobby -> start-roll -> game -> pot-battle
     bank: 50000,
+    pot: 0,
     turnIndex: 0,
     players: [],
     chat: [],
@@ -18,6 +19,18 @@ function createRoom(code, hostId) {
       mailDiscard: [],
       dealDraw: [],
       dealDiscard: []
+    },
+    startRollState: {
+      active: false,
+      round: 1,
+      eligiblePlayerIds: [],
+      rolls: {}
+    },
+    potBattleState: {
+      active: false,
+      round: 1,
+      eligiblePlayerIds: [],
+      rolls: {}
     }
   };
 }
@@ -46,12 +59,15 @@ function createPlayer(id, name, avatar) {
 }
 
 function getCurrentPlayer(room) {
-  if (!room || !Array.isArray(room.players) || !room.players.length) {
+  if (!room || !Array.isArray(room.players) || room.players.length === 0) {
     return null;
   }
 
-  // 🔥 FIX: if turnIndex somehow points to nothing, reset safely
-  if (!room.players[room.turnIndex]) {
+  if (
+    typeof room.turnIndex !== "number" ||
+    room.turnIndex < 0 ||
+    room.turnIndex >= room.players.length
+  ) {
     room.turnIndex = 0;
   }
 
@@ -59,12 +75,17 @@ function getCurrentPlayer(room) {
 }
 
 function nextTurn(room) {
-  if (!room || !Array.isArray(room.players) || !room.players.length) return;
+  if (!room || !Array.isArray(room.players) || room.players.length === 0) {
+    return;
+  }
 
   room.turnIndex = (room.turnIndex + 1) % room.players.length;
 
-  // 🔥 FIX: ensure turnIndex always points to a valid player
-  if (!room.players[room.turnIndex]) {
+  if (
+    typeof room.turnIndex !== "number" ||
+    room.turnIndex < 0 ||
+    room.turnIndex >= room.players.length
+  ) {
     room.turnIndex = 0;
   }
 }

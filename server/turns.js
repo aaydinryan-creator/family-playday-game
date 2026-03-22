@@ -70,6 +70,9 @@ function skipOfflinePlayers(room) {
 }
 
 function beginNextTurn(io, room, emitRoomUpdate) {
+  // 🚨 STOP if pot battle started
+  if (room.phase === "pot-battle") return;
+
   nextTurn(room);
   skipOfflinePlayers(room);
 
@@ -83,9 +86,10 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   if (!room || !player) return;
 
   const currentPlayer = getCurrentPlayer(room);
-  if (!currentPlayer || currentPlayer.id !== player.id) {
-    return;
-  }
+  if (!currentPlayer || currentPlayer.id !== player.id) return;
+
+  // 🚨 BLOCK rolling during pot battle
+  if (room.phase === "pot-battle") return;
 
   room.phase = "rolling";
   emitRoomUpdate(io, room);
@@ -104,17 +108,17 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   });
 
   setTimeout(() => {
+    // 🚨 STOP if pot battle triggered during roll
+    if (room.phase === "pot-battle") return;
+
     room.phase = "moving";
     player.position = to;
 
     if (passedPlayday) {
-      player.cash = Number(player.cash || 0) + PLAYDAY_AMOUNT;
+      player.cash += PLAYDAY_AMOUNT;
+      if (typeof player.money === "number") player.money += PLAYDAY_AMOUNT;
 
-      if (typeof player.money === "number") {
-        player.money += PLAYDAY_AMOUNT;
-      }
-
-      room.bank = Number(room.bank || 0) - PLAYDAY_AMOUNT;
+      room.bank -= PLAYDAY_AMOUNT;
       safelyClampRoomBank(room);
 
       pushSystemMessage(
@@ -141,6 +145,9 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
     emitRoomUpdate(io, room);
 
     setTimeout(() => {
+      // 🚨 STOP if pot battle triggered during move
+      if (room.phase === "pot-battle") return;
+
       room.phase = "resolving";
 
       const beforeCash = Number(player.cash || 0);
@@ -157,11 +164,7 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
       const afterCash = Number(player.cash || 0);
       const delta = afterCash - beforeCash;
 
-      if (typeof player.money !== "number") {
-        player.money = afterCash;
-      } else {
-        player.money = afterCash;
-      }
+      player.money = afterCash;
 
       safelyClampRoomBank(room);
       pushSystemMessage(room, result.message);

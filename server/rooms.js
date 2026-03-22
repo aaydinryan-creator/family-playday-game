@@ -18,9 +18,10 @@ function getRoomBySocketId(rooms, socketId) {
   if (!rooms || !socketId) return null;
 
   return (
-    Object.values(rooms).find((room) =>
-      Array.isArray(room.players) &&
-      room.players.some((player) => player.id === socketId)
+    Object.values(rooms).find(
+      (room) =>
+        Array.isArray(room.players) &&
+        room.players.some((player) => player.id === socketId)
     ) || null
   );
 }
@@ -38,7 +39,9 @@ function removePlayerFromRoom(room, socketId) {
     };
   }
 
-  const removedIndex = room.players.findIndex((player) => player.id === socketId);
+  const removedIndex = room.players.findIndex(
+    (player) => player.id === socketId
+  );
 
   if (removedIndex === -1) {
     return {
@@ -73,11 +76,24 @@ function ensureValidTurnIndex(room) {
   }
 }
 
-function transferHostIfNeeded(room, oldHostId) {
-  if (!room || !Array.isArray(room.players) || !room.players.length) return;
+function transferHostIfNeeded(room, oldHostId = null) {
+  if (!room || !Array.isArray(room.players) || room.players.length === 0) return;
 
-  if (room.hostId === oldHostId) {
-    room.hostId = room.players[0].id;
+  const connectedPlayers = room.players.filter((player) => player.connected !== false);
+
+  if (oldHostId) {
+    if (room.hostId === oldHostId) {
+      room.hostId = (connectedPlayers[0] || room.players[0]).id;
+    }
+    return;
+  }
+
+  const currentHostStillExists = room.players.some(
+    (player) => player.id === room.hostId && player.connected !== false
+  );
+
+  if (!currentHostStillExists) {
+    room.hostId = (connectedPlayers[0] || room.players[0]).id;
   }
 }
 
@@ -92,9 +108,7 @@ function getSafePlayer(player) {
     position: Number(player?.position || 0),
     cash: Number(player?.cash || 0),
     money: Number(
-      typeof player?.money === "number"
-        ? player.money
-        : player?.cash || 0
+      typeof player?.money === "number" ? player.money : player?.cash || 0
     ),
     avatar: player?.avatar || null,
     connected: player?.connected !== false,
