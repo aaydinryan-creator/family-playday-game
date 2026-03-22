@@ -218,8 +218,11 @@ function startPotBattle(room) {
 
   ensureExtendedRoomState(room);
 
-  if (room.phase !== "game") return;
   if (room.potBattleState?.active) return;
+
+  // allow start during tile resolution too
+  const validPhases = ["game", "resolving"];
+  if (!validPhases.includes(room.phase)) return;
 
   const threshold = room.potBattleThreshold || POT_BATTLE_TRIGGER_AMOUNT;
   if (room.pot < threshold && !room.potBattleReady) return;
@@ -263,6 +266,9 @@ function resolvePotBattleRound(room) {
 
     if (winner) {
       winner.cash += room.pot;
+      if (typeof winner.money === "number") {
+        winner.money += room.pot;
+      }
     }
 
     io.to(room.code).emit("potBattleWinner", {
@@ -307,14 +313,17 @@ function maybeTriggerPotBattle(room) {
 
   ensureExtendedRoomState(room);
 
-  if (room.phase !== "game") return;
   if (room.potBattleState?.active) return;
 
   const threshold = room.potBattleThreshold || POT_BATTLE_TRIGGER_AMOUNT;
 
   if (room.pot >= threshold || room.potBattleReady) {
     room.potBattleReady = true;
-    startPotBattle(room);
+
+    // key fix: allow trigger during resolving, not only plain game phase
+    if (room.phase === "game" || room.phase === "resolving") {
+      startPotBattle(room);
+    }
   }
 }
 
@@ -449,6 +458,14 @@ io.on("connection", (socket) => {
     setTimeout(() => {
       maybeTriggerPotBattle(room);
     }, 300);
+
+    setTimeout(() => {
+      maybeTriggerPotBattle(room);
+    }, 1700);
+
+    setTimeout(() => {
+      maybeTriggerPotBattle(room);
+    }, 3200);
   });
 
   socket.on("rollForPotBattle", () => {
@@ -490,7 +507,7 @@ io.on("connection", (socket) => {
 
     addToPot(room, amount, reason);
 
-    if (room.phase === "game") {
+    if (room.phase === "game" || room.phase === "resolving") {
       maybeTriggerPotBattle(room);
     }
   });
