@@ -33,8 +33,7 @@ const DEFAULT_AVATAR = {
   color: "#4fd081"
 };
 
-const POT_BATTLE_CHANCE = 0.05;
-const POT_BATTLE_COOLDOWN_TURNS = 3;
+const POT_BATTLE_TRIGGER_AMOUNT = 3000;
 
 // ---------------------- UTIL ----------------------
 
@@ -52,10 +51,6 @@ function ensureExtendedRoomState(room) {
   if (!room) return;
 
   if (typeof room.pot !== "number") room.pot = 0;
-
-  if (typeof room.turnsSinceLastPotBattle !== "number") {
-    room.turnsSinceLastPotBattle = 0;
-  }
 
   if (!room.startRollState) {
     room.startRollState = {
@@ -83,11 +78,6 @@ function ensureExtendedRoomState(room) {
 function getPlayerName(room, id) {
   const p = room.players.find((p) => p.id === id);
   return p ? p.name : "Unknown";
-}
-
-function shouldTriggerPotBattle(room) {
-  if (room.turnsSinceLastPotBattle < POT_BATTLE_COOLDOWN_TURNS) return false;
-  return Math.random() < POT_BATTLE_CHANCE;
 }
 
 function findPlayerByReconnectId(room, reconnectId) {
@@ -188,6 +178,10 @@ function resolveStartRollRound(room) {
 // ---------------------- POT BATTLE ----------------------
 
 function startPotBattle(room) {
+  if (room.phase !== "game") return;
+  if (room.potBattleState?.active) return;
+  if (room.pot < POT_BATTLE_TRIGGER_AMOUNT) return;
+
   room.phase = "pot-battle";
 
   room.potBattleState = {
@@ -198,8 +192,6 @@ function startPotBattle(room) {
       .map((p) => p.id),
     rolls: {}
   };
-
-  room.turnsSinceLastPotBattle = 0;
 
   io.to(room.code).emit("globalAlert", {
     type: "pot",
@@ -229,13 +221,23 @@ function resolvePotBattleRound(room) {
     }
 
     io.to(room.code).emit("potBattleWinner", {
-      winnerId: winner.id,
+      winnerId: winner ? winner.id : null,
       amount: room.pot
     });
+
+    if (winner) {
+      pushSystemMessage(room, `${winner.name} won the POT BATTLE and took $${room.pot}!`);
+    }
 
     room.pot = 0;
     room.phase = "game";
     room.potBattleState.active = false;
+
+    io.to(room.code).emit("potUpdated", {
+      pot: room.pot,
+      amountAdded: 0,
+      reason: "Pot battle resolved"
+    });
 
     sendTurnUpdate(io, room);
     emitRoomUpdate(io, room);
@@ -254,14 +256,12 @@ function resolvePotBattleRound(room) {
 }
 
 function maybeTriggerPotBattle(room) {
+  if (!room) return;
   if (room.phase !== "game") return;
-  if (room.pot <= 0) return;
+  if (room.potBattleState?.active) return;
 
-  if (shouldTriggerPotBattle(room)) {
+  if (room.pot >= POT_BATTLE_TRIGGER_AMOUNT) {
     startPotBattle(room);
-  } else {
-    room.turnsSinceLastPotBattle++;
-    emitRoomUpdate(io, room);
   }
 }
 
@@ -428,6 +428,12 @@ io.on("connection", (socket) => {
     if (!allowed.includes((reason || "").toLowerCase())) return;
 
     addToPot(room, amount, reason);
+
+    if (room.phase === "game" && room.pot >= POT_BATTLE_TRIGGER_AMOUNT) {
+      setTimeout(() => {
+        maybeTriggerPotBattle(room);
+      }, 200);
+    }
   });
 
   socket.on("sendChatMessage", ({ text }) => {
