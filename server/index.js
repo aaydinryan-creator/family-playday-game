@@ -50,7 +50,21 @@ function normalizeAvatar(avatar) {
 function ensureExtendedRoomState(room) {
   if (!room) return;
 
-  if (typeof room.pot !== "number") room.pot = 0;
+  if (typeof room.pot !== "number" || !Number.isFinite(room.pot)) {
+    room.pot = 0;
+  }
+
+  if (typeof room.potBattleReady !== "boolean") {
+    room.potBattleReady = false;
+  }
+
+  if (typeof room.potBattleTriggered !== "boolean") {
+    room.potBattleTriggered = false;
+  }
+
+  if (!Number.isFinite(room.potBattleThreshold)) {
+    room.potBattleThreshold = POT_BATTLE_TRIGGER_AMOUNT;
+  }
 
   if (!room.startRollState) {
     room.startRollState = {
@@ -72,6 +86,27 @@ function ensureExtendedRoomState(room) {
 
   if (!Array.isArray(room.chat)) {
     room.chat = [];
+  }
+
+  syncPotBattleState(room);
+}
+
+function syncPotBattleState(room) {
+  if (!room) return;
+
+  const threshold = Number.isFinite(room.potBattleThreshold)
+    ? room.potBattleThreshold
+    : POT_BATTLE_TRIGGER_AMOUNT;
+
+  room.potBattleThreshold = threshold;
+
+  if (room.pot >= threshold && !room.potBattleState?.active) {
+    room.potBattleReady = true;
+  }
+
+  if (room.pot < threshold && !room.potBattleState?.active) {
+    room.potBattleReady = false;
+    room.potBattleTriggered = false;
   }
 }
 
@@ -114,6 +149,7 @@ function addToPot(room, amount, reason) {
   if (val <= 0) return;
 
   room.pot += val;
+  syncPotBattleState(room);
 
   io.to(room.code).emit("potUpdated", {
     pot: room.pot,
@@ -179,14 +215,21 @@ function resolveStartRollRound(room) {
 
 function startPotBattle(room) {
   if (!room) return;
+
+  ensureExtendedRoomState(room);
+
   if (room.phase !== "game") return;
   if (room.potBattleState?.active) return;
-  if (room.pot < POT_BATTLE_TRIGGER_AMOUNT) return;
+
+  const threshold = room.potBattleThreshold || POT_BATTLE_TRIGGER_AMOUNT;
+  if (room.pot < threshold && !room.potBattleReady) return;
 
   const eligiblePlayers = room.players.filter((p) => p.connected !== false);
   if (eligiblePlayers.length < 2) return;
 
   room.phase = "pot-battle";
+  room.potBattleReady = false;
+  room.potBattleTriggered = true;
 
   room.potBattleState = {
     active: true,
@@ -234,6 +277,8 @@ function resolvePotBattleRound(room) {
     room.pot = 0;
     room.phase = "game";
     room.potBattleState.active = false;
+    room.potBattleReady = false;
+    room.potBattleTriggered = false;
 
     io.to(room.code).emit("potUpdated", {
       pot: room.pot,
@@ -259,10 +304,16 @@ function resolvePotBattleRound(room) {
 
 function maybeTriggerPotBattle(room) {
   if (!room) return;
+
+  ensureExtendedRoomState(room);
+
   if (room.phase !== "game") return;
   if (room.potBattleState?.active) return;
 
-  if (room.pot >= POT_BATTLE_TRIGGER_AMOUNT) {
+  const threshold = room.potBattleThreshold || POT_BATTLE_TRIGGER_AMOUNT;
+
+  if (room.pot >= threshold || room.potBattleReady) {
+    room.potBattleReady = true;
     startPotBattle(room);
   }
 }
@@ -393,6 +444,8 @@ io.on("connection", (socket) => {
 
     handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage);
 
+    maybeTriggerPotBattle(room);
+
     setTimeout(() => {
       maybeTriggerPotBattle(room);
     }, 300);
@@ -437,9 +490,8 @@ io.on("connection", (socket) => {
 
     addToPot(room, amount, reason);
 
-    // INSTANT trigger the second the pot reaches 3000+
-    if (room.phase === "game" && room.pot >= POT_BATTLE_TRIGGER_AMOUNT) {
-      startPotBattle(room);
+    if (room.phase === "game") {
+      maybeTriggerPotBattle(room);
     }
   });
 

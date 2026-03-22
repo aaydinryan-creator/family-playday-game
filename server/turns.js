@@ -15,6 +15,30 @@ function safelyClampRoomBank(room, fallback = 50000) {
   if (!Number.isFinite(room.bank)) {
     room.bank = fallback;
   }
+
+  if (room.bank < 0) {
+    room.bank = 0;
+  }
+}
+
+function ensureTurnRoomState(room) {
+  if (!room) return;
+
+  if (typeof room.pot !== "number" || !Number.isFinite(room.pot)) {
+    room.pot = 0;
+  }
+
+  if (typeof room.potBattleReady !== "boolean") {
+    room.potBattleReady = false;
+  }
+
+  if (typeof room.potBattleTriggered !== "boolean") {
+    room.potBattleTriggered = false;
+  }
+
+  if (!Number.isFinite(room.potBattleThreshold)) {
+    room.potBattleThreshold = 3000;
+  }
 }
 
 function getSafePlayer(player) {
@@ -33,12 +57,17 @@ function getSafePlayer(player) {
 }
 
 function getSafeRoomSnapshot(room) {
+  ensureTurnRoomState(room);
+
   return {
     code: room.code,
     hostId: room.hostId,
     phase: room.phase,
     bank: room.bank,
     pot: typeof room.pot === "number" ? room.pot : 0,
+    potBattleReady: !!room.potBattleReady,
+    potBattleTriggered: !!room.potBattleTriggered,
+    potBattleThreshold: Number(room.potBattleThreshold || 3000),
     turnIndex: room.turnIndex,
     currentPlayerId: getCurrentPlayer(room)?.id || null,
     players: room.players.map(getSafePlayer),
@@ -70,8 +99,10 @@ function skipOfflinePlayers(room) {
 }
 
 function beginNextTurn(io, room, emitRoomUpdate) {
-  // 🚨 STOP if pot battle started
-  if (room.phase === "pot-battle") return;
+  ensureTurnRoomState(room);
+
+  // STOP if pot battle started or is ready to start
+  if (room.phase === "pot-battle" || room.potBattleReady) return;
 
   nextTurn(room);
   skipOfflinePlayers(room);
@@ -85,11 +116,13 @@ function beginNextTurn(io, room, emitRoomUpdate) {
 function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   if (!room || !player) return;
 
+  ensureTurnRoomState(room);
+
   const currentPlayer = getCurrentPlayer(room);
   if (!currentPlayer || currentPlayer.id !== player.id) return;
 
-  // 🚨 BLOCK rolling during pot battle
-  if (room.phase === "pot-battle") return;
+  // BLOCK rolling during pot battle or if pot battle is already ready
+  if (room.phase === "pot-battle" || room.potBattleReady) return;
 
   room.phase = "rolling";
   emitRoomUpdate(io, room);
@@ -108,8 +141,8 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
   });
 
   setTimeout(() => {
-    // 🚨 STOP if pot battle triggered during roll
-    if (room.phase === "pot-battle") return;
+    // STOP if pot battle triggered during roll
+    if (room.phase === "pot-battle" || room.potBattleReady) return;
 
     room.phase = "moving";
     player.position = to;
@@ -145,8 +178,8 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
     emitRoomUpdate(io, room);
 
     setTimeout(() => {
-      // 🚨 STOP if pot battle triggered during move
-      if (room.phase === "pot-battle") return;
+      // STOP if pot battle triggered during move
+      if (room.phase === "pot-battle" || room.potBattleReady) return;
 
       room.phase = "resolving";
 
@@ -158,13 +191,36 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
         tile: null,
         cards: [],
         revealDuration: 3500,
-        soundCue: "tile_land"
+        soundCue: "tile_land",
+        pot: room.pot,
+        potBattleReady: room.potBattleReady,
+        potBattleTriggered: false,
+        potBattleThreshold: room.potBattleThreshold
       };
 
       const afterCash = Number(player.cash || 0);
       const delta = afterCash - beforeCash;
 
       player.money = afterCash;
+
+      if (typeof result.pot === "number" && Number.isFinite(result.pot)) {
+        room.pot = result.pot;
+      }
+
+      if (typeof result.potBattleReady === "boolean") {
+        room.potBattleReady = result.potBattleReady;
+      }
+
+      if (typeof result.potBattleTriggered === "boolean") {
+        room.potBattleTriggered = result.potBattleTriggered;
+      }
+
+      if (
+        typeof result.potBattleThreshold === "number" &&
+        Number.isFinite(result.potBattleThreshold)
+      ) {
+        room.potBattleThreshold = result.potBattleThreshold;
+      }
 
       safelyClampRoomBank(room);
       pushSystemMessage(room, result.message);
@@ -179,6 +235,10 @@ function handlePlayerRoll(io, room, player, emitRoomUpdate, pushSystemMessage) {
         revealDuration: result.revealDuration || 3500,
         soundCue: result.soundCue || null,
         cashDelta: delta,
+        pot: room.pot,
+        potBattleReady: !!room.potBattleReady,
+        potBattleTriggered: !!room.potBattleTriggered,
+        potBattleThreshold: Number(room.potBattleThreshold || 3000),
         room: getSafeRoomSnapshot(room)
       });
 
