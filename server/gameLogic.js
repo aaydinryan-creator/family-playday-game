@@ -29,9 +29,13 @@ function ensureRoomPot(room) {
 function addToPot(room, amount) {
   if (!room) return;
   ensureRoomPot(room);
+
   const value = safeNumber(amount);
   if (value <= 0) return;
+
   room.pot += value;
+
+ 
 }
 
 function getTileAtPosition(position) {

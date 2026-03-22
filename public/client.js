@@ -1301,6 +1301,18 @@ socket.on("turnRolled", ({ playerName, roll }) => {
   updateTurnUI();
   showSharedDice(`${playerName} is rolling`);
 
+  // 🎲 FLYING DICE EFFECT
+  const flyingDice = document.getElementById("flyingDice");
+  if (flyingDice) {
+    flyingDice.classList.remove("active");
+    void flyingDice.offsetWidth; // restart animation
+    flyingDice.classList.add("active");
+
+    setTimeout(() => {
+      flyingDice.classList.remove("active");
+    }, 1000);
+  }
+
   setTimeout(() => {
     stopSharedDice(roll, playerName);
   }, 1200);
