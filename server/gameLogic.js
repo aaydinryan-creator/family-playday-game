@@ -83,6 +83,16 @@ function addToPot(room, amount) {
   return markPotBattleReady(room);
 }
 
+function addPartialToPot(room, amount, percent = 0.5) {
+  const value = safeNumber(amount);
+  if (value <= 0) return false;
+
+  const portion = Math.floor(value * percent);
+  if (portion <= 0) return false;
+
+  return addToPot(room, portion);
+}
+
 function getTileAtPosition(position) {
   if (position < 0 || position >= board.length) return null;
   return board[position];
@@ -559,7 +569,8 @@ function resolveCardEffect(card, player, room) {
   if (!action) {
     return {
       text: card.text,
-      amount: Number(card.amount || 0)
+      amount: Number(card.amount || 0),
+      potEligibleLoss: card.amount < 0 ? Math.abs(Number(card.amount || 0)) : 0
     };
   }
 
@@ -570,7 +581,8 @@ function resolveCardEffect(card, player, room) {
       if (!others.length) {
         return {
           text: `${card.text} But there was nobody else to rob.`,
-          amount: 0
+          amount: 0,
+          potEligibleLoss: 0
         };
       }
 
@@ -582,7 +594,8 @@ function resolveCardEffect(card, player, room) {
 
       return {
         text: `${card.text} Total collected: ${formatMoney(total)}.`,
-        amount: total
+        amount: total,
+        potEligibleLoss: 0
       };
     }
 
@@ -592,7 +605,8 @@ function resolveCardEffect(card, player, room) {
       if (!others.length) {
         return {
           text: `${card.text} Lucky for you, nobody else was there.`,
-          amount: 0
+          amount: 0,
+          potEligibleLoss: 0
         };
       }
 
@@ -604,7 +618,8 @@ function resolveCardEffect(card, player, room) {
 
       return {
         text: `${card.text} Total lost: ${formatMoney(total)}.`,
-        amount: -total
+        amount: -total,
+        potEligibleLoss: 0
       };
     }
 
@@ -612,7 +627,8 @@ function resolveCardEffect(card, player, room) {
       if (!others.length) {
         return {
           text: `${card.text} But there was nobody else around to victimise.`,
-          amount: 0
+          amount: 0,
+          potEligibleLoss: 0
         };
       }
 
@@ -622,7 +638,8 @@ function resolveCardEffect(card, player, room) {
 
       return {
         text: `${card.text} You ripped ${formatMoney(stealAmount)} from ${target.name}.`,
-        amount: stealAmount
+        amount: stealAmount,
+        potEligibleLoss: 0
       };
     }
 
@@ -630,7 +647,8 @@ function resolveCardEffect(card, player, room) {
       if (!others.length) {
         return {
           text: `${card.text} But there was nobody else there to benefit from your stupidity.`,
-          amount: 0
+          amount: 0,
+          potEligibleLoss: 0
         };
       }
 
@@ -640,7 +658,8 @@ function resolveCardEffect(card, player, room) {
 
       return {
         text: `${card.text} ${target.name} received ${formatMoney(payAmount)} from your disaster.`,
-        amount: -payAmount
+        amount: -payAmount,
+        potEligibleLoss: 0
       };
     }
 
@@ -648,7 +667,8 @@ function resolveCardEffect(card, player, room) {
       if (!others.length) {
         return {
           text: `${card.text} But there was nobody else there, so you just stayed broke in peace.`,
-          amount: 0
+          amount: 0,
+          potEligibleLoss: 0
         };
       }
 
@@ -673,14 +693,16 @@ function resolveCardEffect(card, player, room) {
 
       return {
         text: resultText,
-        amount: net
+        amount: net,
+        potEligibleLoss: 0
       };
     }
 
     default:
       return {
         text: card.text,
-        amount: Number(card.amount || 0)
+        amount: Number(card.amount || 0),
+        potEligibleLoss: 0
       };
   }
 }
@@ -712,7 +734,8 @@ function playCard(player, room, card, type, title, explicitSound = null) {
     applyCardAmount(player, room, card.amount);
     resolved = {
       text: card.text,
-      amount: Number(card.amount || 0)
+      amount: Number(card.amount || 0),
+      potEligibleLoss: card.amount < 0 ? Math.abs(Number(card.amount || 0)) : 0
     };
   }
 
@@ -723,21 +746,24 @@ function playCard(player, room, card, type, title, explicitSound = null) {
     text: personalizeText(resolved.text, player.name),
     amount: resolved.amount,
     type,
-    sound
+    sound,
+    potEligibleLoss: resolved.potEligibleLoss || 0
   };
 }
 
 function drawSpecificCards(player, room, cardList, type, title, soundCue = null) {
   const cards = [];
   let total = 0;
+  let potEligibleLoss = 0;
 
   for (const card of cardList) {
     const playedCard = playCard(player, room, card, type, title, soundCue);
     total += playedCard.amount;
+    potEligibleLoss += playedCard.potEligibleLoss || 0;
     cards.push(playedCard);
   }
 
-  return { cards, total, soundCue };
+  return { cards, total, soundCue, potEligibleLoss };
 }
 
 function drawMailCards(player, room, count) {
@@ -745,12 +771,14 @@ function drawMailCards(player, room, count) {
 
   const cards = [];
   let total = 0;
+  let potEligibleLoss = 0;
 
   for (let i = 0; i < count; i++) {
     const card = drawFromRoomDeck(room, "mail");
     const playedCard = playCard(player, room, card, "mail", "MAIL");
 
     total += playedCard.amount;
+    potEligibleLoss += playedCard.potEligibleLoss || 0;
     cards.push(playedCard);
   }
 
@@ -758,7 +786,7 @@ function drawMailCards(player, room, count) {
   if (total > 0) soundCue = "mail_good";
   if (total < 0) soundCue = "mail_bad";
 
-  return { cards, total, soundCue };
+  return { cards, total, soundCue, potEligibleLoss };
 }
 
 function drawDealCard(player, room) {
@@ -771,7 +799,8 @@ function drawDealCard(player, room) {
   return {
     cards: [playedCard],
     total: playedCard.amount,
-    soundCue
+    soundCue,
+    potEligibleLoss: playedCard.potEligibleLoss || 0
   };
 }
 
@@ -881,6 +910,11 @@ function handleTile(room, player, roll) {
       cards = result.cards;
       soundCue = result.soundCue;
 
+      if (result.potEligibleLoss > 0) {
+        potBattleTriggeredThisTurn =
+          addPartialToPot(room, result.potEligibleLoss, 0.5) || potBattleTriggeredThisTurn;
+      }
+
       if (doForcedSequence && forcedKey === "alayna") {
         message = `${player.name} got approved for a credit card and immediately ruined their life.`;
       } else if (doForcedSequence && forcedKey === "lori") {
@@ -900,6 +934,11 @@ function handleTile(room, player, roll) {
       const result = drawDealCard(player, room);
       cards = result.cards;
       soundCue = result.soundCue;
+
+      if (result.potEligibleLoss > 0) {
+        potBattleTriggeredThisTurn =
+          addPartialToPot(room, result.potEligibleLoss, 0.5) || potBattleTriggeredThisTurn;
+      }
 
       const foundItem = maybeFindItemOnDealTile(player);
 
@@ -980,6 +1019,8 @@ function handleTile(room, player, roll) {
     case "yardsale": {
       const cost = roll * 100;
       removeMoney(player, room, cost);
+      potBattleTriggeredThisTurn =
+        addPartialToPot(room, cost, 0.5) || potBattleTriggeredThisTurn;
 
       if (chance(52)) {
         const item = createRandomItem();
